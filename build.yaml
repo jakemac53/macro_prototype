@@ -1,0 +1,15 @@
+targets:
+  $default:
+    builders:
+      macro_builder:macro_builder:
+        enabled: true
+        generate_for:
+        - example/user.dart
+
+builders:
+  macro_builder:
+    import: "package:macro_builder/macro_builder.dart"
+    builder_factories: ["createBuilder"]
+    build_extensions: {".dart": [".dart.patch"]}
+    auto_apply: dependents
+    build_to: source
