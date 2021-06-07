@@ -8,6 +8,6 @@ builders:
   macro_builder:
     import: "package:macro_builder/macro_builder.dart"
     builder_factories: ["typesBuilder", "declarationsBuilder", "definitionsBuilder"]
-    build_extensions: {".gen.dart": [".types.dart.", ".declaration.dart.", ".dart"]}
+    build_extensions: {".gen.dart": [".types.dart.", ".declarations.dart.", ".dart"]}
     auto_apply: dependents
     build_to: source

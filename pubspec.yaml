@@ -7,3 +7,7 @@ dependencies:
   source_gen: ^1.0.1
 dev_dependencies:
   build_runner: any
+
+# dependency_overrides:
+#   analyzer:
+#     path: ../dart-lang-sdk/sdk/pkg/analyzer

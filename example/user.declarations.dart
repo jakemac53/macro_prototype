@@ -5,11 +5,8 @@ import 'package:macro_builder/src/observable.dart';
 class User {
   @observable
   external String? name;
-
+  external Map<String, Object?> toJson();
   User({String? name}) {
-    // TODO: ugly - can't used field initializing formals etc
     this.name = name;
   }
-
-  external Map<String, Object?> toJson();
 }

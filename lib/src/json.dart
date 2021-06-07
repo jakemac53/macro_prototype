@@ -20,5 +20,6 @@ class JsonMacro implements ClassDefinitionMacro {
     }
     code = Code('$code};');
     toJsonMethod.implement(code);
+    print('\n$code');
   }
 }

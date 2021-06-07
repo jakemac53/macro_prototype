@@ -1,19 +1,26 @@
 # Description
 
-This is a basic prototype for macros using package:build.
-
-## Setup
-
-To use it you will need to build a custom SDK that allows patch files, which
-exists here https://github.com/jakemac53/sdk/tree/allow-arbitrary-patches.
+This is a basic prototype for 3 phase macros using package:build.
 
 ## Writing a macro
 
-To create a new macro see the example one at `lib/src/json.dart`. You will need
-to update the `createBuilder` method in `macro_builder.dart`, to pass in your
-new macro to the constructor.
+To create a new macro see the example one at `lib/src/json.dart` or
+`lib/src/observable`. Once you create a builder you will need to add it to all
+the phases in which it should run, see the `typesBuilder`,
+`declarationsBuilder`, and `definitionsBuilder` methods in
+`macro_builder.dart`, and to pass in your new macro to the corresponding
+constructor.
 
-Note that only Phase 3 macros are supported, at least for now.
+## Creating an example
+
+For this prototype you need to create your example files that use your macros
+with the extension `.gen.dart`. We will run codegen on only those files,
+applying the macros and generating a file for the output at each phase.
+
+The final phase will create a regular `.dart` file which is what you should
+import. If you want to import other files which also use codegen, you should do
+so by importing the `.gen.dart` files, this will ensure they are visible to the
+build of your library (and only the appropriate info should be available).
 
 ## Running macros
 

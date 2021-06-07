@@ -1,0 +1,7 @@
+analyzer:
+  strong-mode:
+    implicit-casts: false
+
+linter:
+  rules:
+    - unawaited_futures

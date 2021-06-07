@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
@@ -11,15 +12,21 @@ import 'src/observable.dart';
 import 'code.dart';
 import 'macro.dart';
 
-Builder typesBuilder(_) => TypesMacroBuilder([toJson, observable]);
-Builder declarationsBuilder(_) =>
-    DeclarationsMacroBuilder([toJson, observable]);
-Builder defintionsBuilder(_) => DefinitionsMacroBuilder([toJson, observable]);
+Builder typesBuilder(_) => TypesMacroBuilder([]);
+Builder declarationsBuilder(_) => DeclarationsMacroBuilder([]);
+Builder definitionsBuilder(_) => DefinitionsMacroBuilder([toJson, observable]);
 
 abstract class MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
+  final String _inputExtension;
+  final String _outputExtension;
 
-  MacroBuilder(Iterable<Macro> macros)
+  Map<String, List<String>> get buildExtensions => {
+        _inputExtension: [_outputExtension]
+      };
+
+  MacroBuilder(
+      Iterable<Macro> macros, this._inputExtension, this._outputExtension)
       : macros = {
           for (var macro in macros)
             TypeChecker.fromRuntime(macro.runtimeType): macro,
@@ -27,60 +34,112 @@ abstract class MacroBuilder extends Builder {
 
   @override
   Future<void> build(BuildStep buildStep) async {
+    var resolver = await buildStep.resolver;
     var library = await buildStep.inputLibrary;
     var buffer = StringBuffer();
+    var ast = await resolver.compilationUnitFor(buildStep.inputId);
+    for (var directive in ast.directives) {
+      // MEGA HACK: Replace earlier phase imports with next phase ones.
+      var directiveSrc =
+          directive.toSource().replaceAll(_inputExtension, _outputExtension);
+      buffer.writeln(directiveSrc);
+    }
+
     for (var topLevel in library.topLevelElements) {
-      _applyMacros(topLevel, buffer, buffer);
+      await _applyMacros(topLevel, buffer, buffer, resolver,
+          await buildStep.readAsString(buildStep.inputId));
     }
-    if (buffer.isNotEmpty) {
-      var outputId = buildStep.inputId.addExtension('.patch');
-      var formatted = DartFormatter().format('''
-import 'package:macro_builder/patch.dart';
-$buffer''', uri: outputId.uri);
-      await buildStep.writeAsString(outputId, formatted);
-    }
+    var inputPath = buildStep.inputId.path;
+    var outputId = AssetId(
+        buildStep.inputId.package,
+        inputPath.replaceRange(inputPath.length - _inputExtension.length,
+            inputPath.length, _outputExtension));
+    var formatted =
+        DartFormatter().format(buffer.toString(), uri: outputId.uri);
+    await buildStep.writeAsString(outputId, formatted);
   }
 
-  void _applyMacros(
-      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+  Future<void> _applyMacros(
+    Element element,
+    StringBuffer buffer,
+    StringBuffer libraryBuffer,
+    Resolver resolver,
+    String originalSource, {
+    // We don't want to copy the impls of anything in this list over, they were
+    // implemented by a class macro.
+    List<String>? implementedDecls,
+  }) async {
     if (element is ClassElement) {
       var classBuffer = StringBuffer();
+      var clazz = (await resolver.astNodeFor(element, resolve: true))
+          as ClassDeclaration;
+      var start = clazz.offset;
+      var end = clazz.leftBracket.charOffset;
+      classBuffer.writeln(originalSource.substring(start, end + 1));
+
+      implementedDecls = [];
+      for (var checker in macros.keys) {
+        implementedDecls.addAll(maybeApplyMacro(checker, macros[checker]!,
+                element, classBuffer, libraryBuffer) ??
+            const []);
+      }
       for (var field in element.fields) {
-        _applyMacros(field, classBuffer, libraryBuffer);
+        await _applyMacros(
+            field, classBuffer, libraryBuffer, resolver, originalSource,
+            implementedDecls: implementedDecls);
       }
       for (var method in element.methods) {
-        _applyMacros(method, classBuffer, libraryBuffer);
+        await _applyMacros(
+            method, classBuffer, libraryBuffer, resolver, originalSource,
+            implementedDecls: implementedDecls);
       }
-      for (var checker in macros.keys) {
-        maybeApplyMacro(
-            checker, macros[checker]!, element, classBuffer, libraryBuffer);
+      for (var constructor in element.constructors) {
+        await _applyMacros(
+            constructor, classBuffer, libraryBuffer, resolver, originalSource,
+            implementedDecls: implementedDecls);
       }
-      if (classBuffer.isNotEmpty) {
-        buffer.writeln('''
-@patch
-class ${element.name} {
-$classBuffer
-}''');
-      }
+      classBuffer.writeln('}');
+      buffer.writeln(classBuffer);
     } else {
+      var memberBuffer = StringBuffer();
       for (var checker in macros.keys) {
         maybeApplyMacro(
-            checker, macros[checker]!, element, buffer, libraryBuffer);
+            checker, macros[checker]!, element, memberBuffer, libraryBuffer);
+      }
+      if (memberBuffer.isEmpty) {
+        if (implementedDecls?.contains(element.name!) != true) {
+          var node = (await resolver.astNodeFor(element, resolve: true))!;
+          if (element is FieldElement) {
+            node = node.parent!.parent!;
+          }
+          buffer.writeln(node.toSource());
+        }
+      } else {
+        var node = (await resolver.astNodeFor(element, resolve: true))!;
+        if (node is AnnotatedNode) {
+          for (var meta in node.metadata) {
+            buffer.writeln(meta.toSource());
+          }
+        }
+        buffer.writeln(memberBuffer);
       }
     }
   }
 
-  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
-      StringBuffer buffer, StringBuffer libraryBuffer);
+  // When applied to classes, returns the list names of the modified
+  // declarations during execution of this macro
+  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
+      Element element, StringBuffer buffer, StringBuffer libraryBuffer);
 }
 
 class TypesMacroBuilder extends MacroBuilder {
-  TypesMacroBuilder(Iterable<Macro> macros) : super(macros);
+  TypesMacroBuilder(Iterable<Macro> macros)
+      : super(macros, '.gen.dart', '.types.dart');
 
   @override
-  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
-      StringBuffer buffer, StringBuffer libraryBuffer) {
-    if (!checker.hasAnnotationOf(element)) return;
+  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
+      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+    if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassTypeMacro) {
       if (element is! ClassElement) {
         throw ArgumentError(
@@ -88,24 +147,17 @@ class TypesMacroBuilder extends MacroBuilder {
       }
       macro.type(_ImplementableTargetClassType(element, libraryBuffer));
     }
-
-    throw UnsupportedError(
-        'This prototype doesn\'t support phase 1 (type) macros');
   }
-
-  @override
-  Map<String, List<String>> get buildExtensions => {
-        ".gen.dart": [".types.dart."]
-      };
 }
 
 class DeclarationsMacroBuilder extends MacroBuilder {
-  DeclarationsMacroBuilder(Iterable<Macro> macros) : super(macros);
+  DeclarationsMacroBuilder(Iterable<Macro> macros)
+      : super(macros, '.types.dart', '.declarations.dart');
 
   @override
-  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
-      StringBuffer buffer, StringBuffer libraryBuffer) {
-    if (!checker.hasAnnotationOf(element)) return;
+  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
+      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+    if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassDeclarationMacro) {
       if (element is! ClassElement) {
         throw ArgumentError(
@@ -113,6 +165,7 @@ class DeclarationsMacroBuilder extends MacroBuilder {
       }
       macro.declare(_ImplementableTargetClassDeclaration(element,
           classBuffer: buffer, libraryBuffer: libraryBuffer));
+      // TODO: return list of names of declarations modified
     }
     if (macro is FieldDeclarationMacro) {
       if (element is! FieldElement) {
@@ -120,12 +173,6 @@ class DeclarationsMacroBuilder extends MacroBuilder {
             'Macro $macro can only be used on fields, but was found on $element');
       }
       macro.declare(_ImplementableTargetFieldDeclaration(element, buffer));
-    } else if (macro is FieldDefinitionMacro) {
-      if (element is! FieldElement) {
-        throw ArgumentError(
-            'Macro $macro can only be used on fields, but was found on $element');
-      }
-      macro.define(_ImplementableTargetFieldDefinition(element, buffer));
     } else if (macro is MethodDeclarationMacro) {
       if (element is! MethodElement) {
         throw ArgumentError(
@@ -134,26 +181,24 @@ class DeclarationsMacroBuilder extends MacroBuilder {
       macro.declare(_ImplementableTargetMethodDeclaration(element, buffer));
     }
   }
-
-  @override
-  Map<String, List<String>> get buildExtensions => {
-        ".types.dart.": [".declaration.dart."]
-      };
 }
 
 class DefinitionsMacroBuilder extends MacroBuilder {
-  DefinitionsMacroBuilder(Iterable<Macro> macros) : super(macros);
+  DefinitionsMacroBuilder(Iterable<Macro> macros)
+      : super(macros, '.declarations.dart', '.dart');
 
   @override
-  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
-      StringBuffer buffer, StringBuffer libraryBuffer) {
-    if (!checker.hasAnnotationOf(element)) return;
+  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
+      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+    if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassDefinitionMacro) {
       if (element is! ClassElement) {
         throw ArgumentError(
             'Macro $macro can only be used on classes, but was found on $element');
       }
-      macro.define(_ImplementableTargetClassDefinition(element, buffer));
+      var targetClass = _ImplementableTargetClassDefinition(element, buffer);
+      macro.define(targetClass);
+      return targetClass._implementedDeclarations;
     } else if (macro is FieldDefinitionMacro) {
       if (element is! FieldElement) {
         throw ArgumentError(
@@ -168,11 +213,6 @@ class DefinitionsMacroBuilder extends MacroBuilder {
       macro.define(_ImplementableTargetMethodDefinition(element, buffer));
     }
   }
-
-  @override
-  Map<String, List<String>> get buildExtensions => {
-        ".declaration.dart.": [".dart."]
-      };
 }
 
 class _ImplementableTargetClassType extends AnalyzerTypeReference
@@ -233,6 +273,9 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
     implements TargetClassDefinition {
   final StringBuffer _buffer;
 
+  // Names of declarations implemented during execution of this macro.
+  final _implementedDeclarations = <String>[];
+
   _ImplementableTargetClassDefinition(ClassElement element, this._buffer)
       : super(element);
 
@@ -240,7 +283,8 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
   Iterable<TargetFieldDefinition> get fields sync* {
     var e = element as ClassElement;
     for (var field in e.fields) {
-      yield _ImplementableTargetFieldDefinition(field, _buffer);
+      yield _ImplementableTargetFieldDefinition(field, _buffer,
+          parentClass: this);
     }
   }
 
@@ -248,7 +292,8 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
   Iterable<TargetMethodDefinition> get methods sync* {
     var e = element as ClassElement;
     for (var method in e.methods) {
-      yield _ImplementableTargetMethodDefinition(method, _buffer);
+      yield _ImplementableTargetMethodDefinition(method, _buffer,
+          parentClass: this);
     }
   }
 }
@@ -266,14 +311,16 @@ class _ImplementableTargetFieldDeclaration extends AnalyzerFieldDeclaration
 class _ImplementableTargetFieldDefinition extends AnalyzerFieldDefinition
     implements TargetFieldDefinition {
   final StringBuffer _buffer;
+  final _ImplementableTargetClassDefinition? parentClass;
 
-  _ImplementableTargetFieldDefinition(FieldElement element, this._buffer)
+  _ImplementableTargetFieldDefinition(FieldElement element, this._buffer,
+      {this.parentClass})
       : super(element);
 
   @override
   void withInitializer(Code body, {List<Code>? supportingDeclarations}) {
+    parentClass?._implementedDeclarations.add(name);
     _buffer.writeln('''
-@patch
 ${type.toCode()} ${name} = $body;''');
     supportingDeclarations?.forEach(_buffer.writeln);
   }
@@ -281,11 +328,8 @@ ${type.toCode()} ${name} = $body;''');
   @override
   void withGetterSetterPair(Code getter, Code setter,
       {List<Code>? supportingDeclarations}) {
-    _buffer.writeln('''
-@patch
-$getter
-@patch
-$setter''');
+    parentClass?._implementedDeclarations.add(name);
+    _buffer..writeln(getter)..writeln(setter);
     supportingDeclarations?.forEach(_buffer.writeln);
   }
 }
@@ -304,16 +348,16 @@ class _ImplementableTargetMethodDeclaration extends AnalyzerMethodDeclaration
 class _ImplementableTargetMethodDefinition extends AnalyzerMethodDefinition
     implements TargetMethodDefinition {
   final StringBuffer _buffer;
+  final _ImplementableTargetClassDefinition? parentClass;
 
-  _ImplementableTargetMethodDefinition(MethodElement element, this._buffer)
+  _ImplementableTargetMethodDefinition(MethodElement element, this._buffer,
+      {this.parentClass})
       : super(element);
 
   @override
   void implement(Code code, {List<Code>? supportingDeclarations}) {
-    _buffer.writeln('''
-@patch
-${returnType.toCode()} ${name}(
-''');
+    parentClass?._implementedDeclarations.add(name);
+    _buffer.writeln('${returnType.toCode()} ${name}(');
     for (var positional in positionalParameters) {
       _buffer.writeln('${positional.type.toCode()} ${positional.name},');
     }
