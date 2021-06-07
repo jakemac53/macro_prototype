@@ -1,8 +1,10 @@
 import 'package:macro_builder/src/json.dart';
+import 'package:macro_builder/src/observable.dart';
 
 @toJson
 class User {
-  final String name;
+  @observable
+  String name;
 
   User({required this.name});
 

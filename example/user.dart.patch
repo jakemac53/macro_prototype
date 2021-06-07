@@ -3,6 +3,15 @@ import 'package:macro_builder/patch.dart';
 @patch
 class User {
   @patch
+  String get name => _name;
+  @patch
+  void set name(String val) {
+    print('Setting name to ${val}');
+    _name = val;
+  }
+
+  String _name;
+  @patch
   Map<String, Object?> toJson() => <String, Object?>{
         "name": name,
       };

@@ -130,7 +130,7 @@ abstract class TargetMethodDeclaration implements MethodDeclaration {
 }
 
 abstract class TargetMethodDefinition implements MethodDefinition {
-  void implement(Code body);
+  void implement(Code body, {List<Code>? supportingDeclarations});
 }
 
 abstract class FieldType {
@@ -161,11 +161,12 @@ abstract class TargetFieldDeclaration implements FieldDeclaration {
 
 abstract class TargetFieldDefinition implements FieldDefinition {
   /// Implement this as a normal field and supply an initializer.
-  void withInitializer(Code body);
+  void withInitializer(Code body, {List<Code>? supportingDeclarations});
 
   /// Implement this as a getter/setter pair, with an optional new backing
   /// field.
-  void withGetterSetterPair(Code getter, Code setter, {Code? privateField});
+  void withGetterSetterPair(Code getter, Code setter,
+      {List<Code>? supportingDeclarations});
 }
 
 abstract class ParameterType {

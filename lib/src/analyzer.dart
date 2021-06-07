@@ -5,22 +5,60 @@ import 'package:analyzer/dart/element/type.dart';
 import '../code.dart';
 import '../macro.dart';
 
-class _AnalyzerTypeDefinition implements TypeDefinition {
+class AnalyzerTypeDeclaration implements TypeDeclaration {
   final TypeDefiningElement element;
   final DartType? originalReference;
 
-  _AnalyzerTypeDefinition(this.element, {this.originalReference});
+  AnalyzerTypeDeclaration(this.element, {this.originalReference});
 
   @override
   bool get isNullable =>
       originalReference?.nullabilitySuffix == NullabilitySuffix.question;
 
   @override
+  bool isSubtype(TypeDeclaration other) => throw UnimplementedError();
+
+  @override
+  String get name => element.name!;
+
+  @override
+  Scope get scope => throw UnimplementedError();
+
+  @override
+  Iterable<TypeDeclaration> get typeArguments sync* {
+    var reference = originalReference;
+    if (reference is ParameterizedType) {
+      for (var typeArgument in reference.typeArguments) {
+        yield AnalyzerTypeDeclaration(
+            typeArgument.element! as TypeDefiningElement,
+            originalReference: typeArgument);
+      }
+    }
+  }
+
+  @override
+  Iterable<TypeParameterDeclaration> get typeParameters sync* {
+    var e = element;
+    if (e is ClassElement) {
+      for (var parameter in e.typeParameters) {
+        yield AnalyzerTypeParameterDeclaration(parameter);
+      }
+    }
+  }
+}
+
+class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
+    implements TypeDefinition {
+  AnalyzerTypeDefinition(TypeDefiningElement element,
+      {DartType? originalReference})
+      : super(element, originalReference: originalReference);
+
+  @override
   Iterable<FieldDefinition> get fields sync* {
     var e = element;
     if (e is ClassElement) {
       for (var field in e.fields) {
-        yield _AnalyzerFieldDefinition(field);
+        yield AnalyzerFieldDefinition(field);
       }
     }
   }
@@ -33,23 +71,17 @@ class _AnalyzerTypeDefinition implements TypeDefinition {
     var e = element;
     if (e is ClassElement) {
       for (var method in e.methods) {
-        yield _AnalyzerMethodDefinition(method);
+        yield AnalyzerMethodDefinition(method);
       }
     }
   }
-
-  @override
-  String get name => element.name!;
-
-  @override
-  Scope get scope => throw UnimplementedError();
 
   @override
   Iterable<TypeDefinition> get superinterfaces sync* {
     var e = element;
     if (e is ClassElement) {
       for (var interface in e.allSupertypes) {
-        yield _AnalyzerTypeDefinition(interface.element,
+        yield AnalyzerTypeDefinition(interface.element,
             originalReference: interface);
       }
     }
@@ -60,7 +92,7 @@ class _AnalyzerTypeDefinition implements TypeDefinition {
     var reference = originalReference;
     if (reference is ParameterizedType) {
       for (var typeArgument in reference.typeArguments) {
-        yield _AnalyzerTypeDefinition(
+        yield AnalyzerTypeDefinition(
             typeArgument.element! as TypeDefiningElement,
             originalReference: typeArgument);
       }
@@ -72,106 +104,106 @@ class _AnalyzerTypeDefinition implements TypeDefinition {
     var e = element;
     if (e is ClassElement) {
       for (var parameter in e.typeParameters) {
-        yield _AnalyzerTypeParameterDefinition(parameter);
+        yield AnalyzerTypeParameterDefinition(parameter);
       }
     }
   }
 }
 
-class AnalyzerTargetClassDefinition extends _AnalyzerTypeDefinition
-    implements TargetClassDefinition {
-  AnalyzerTargetClassDefinition(ClassElement element) : super(element);
-
-  @override
-  Iterable<TargetFieldDefinition> get fields sync* {
-    var e = element as ClassElement;
-    for (var field in e.fields) {
-      yield AnalyzerTargetFieldDefinition(field);
-    }
-  }
-
-  @override
-  Iterable<TargetMethodDefinition> get methods sync* {
-    var e = element as ClassElement;
-    for (var method in e.methods) {
-      yield AnalyzerTargetMethodDefinition(method);
-    }
-  }
-}
-
-class _AnalyzerMethodDefinition implements MethodDefinition {
+class AnalyzerMethodDeclaration implements MethodDeclaration {
   final MethodElement element;
 
-  _AnalyzerMethodDefinition(this.element);
+  AnalyzerMethodDeclaration(this.element);
 
   @override
   String get name => element.name;
 
   @override
+  Map<String, ParameterDeclaration> get namedParameters => {
+        for (var param in element.parameters)
+          if (param.isNamed) param.name: AnalyzerParameterDeclaration(param),
+      };
+
+  @override
+  Iterable<ParameterDeclaration> get positionalParameters sync* {
+    for (var param in element.parameters) {
+      if (!param.isPositional) continue;
+      yield AnalyzerParameterDeclaration(param);
+    }
+  }
+
+  @override
+  TypeDeclaration get returnType => AnalyzerTypeDeclaration(
+      element.returnType.element! as TypeDefiningElement,
+      originalReference: element.returnType);
+
+  @override
+  Iterable<TypeParameterDeclaration> get typeParameters sync* {
+    for (var typeParam in element.typeParameters) {
+      yield AnalyzerTypeParameterDeclaration(typeParam);
+    }
+  }
+}
+
+class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
+    implements MethodDefinition {
+  AnalyzerMethodDefinition(MethodElement element) : super(element);
+
+  @override
   Map<String, ParameterDefinition> get namedParameters => {
         for (var param in element.parameters)
-          if (param.isNamed) param.name: _AnalyzerParameterDefinition(param),
+          if (param.isNamed) param.name: AnalyzerParameterDefinition(param),
       };
 
   @override
   Iterable<ParameterDefinition> get positionalParameters sync* {
     for (var param in element.parameters) {
       if (!param.isPositional) continue;
-      yield _AnalyzerParameterDefinition(param);
+      yield AnalyzerParameterDefinition(param);
     }
   }
 
   @override
-  TypeDefinition get returnType => _AnalyzerTypeDefinition(
-      element.returnType.element! as TypeDefiningElement,
-      originalReference: element.returnType);
+  TypeDefinition get returnType =>
+      AnalyzerTypeDefinition(element.returnType.element! as TypeDefiningElement,
+          originalReference: element.returnType);
 
   @override
   Iterable<TypeParameterDefinition> get typeParameters sync* {
     for (var typeParam in element.typeParameters) {
-      yield _AnalyzerTypeParameterDefinition(typeParam);
+      yield AnalyzerTypeParameterDefinition(typeParam);
     }
   }
 }
 
-class AnalyzerTargetMethodDefinition extends _AnalyzerMethodDefinition
-    implements TargetMethodDefinition {
-  AnalyzerTargetMethodDefinition(MethodElement element) : super(element);
-
-  @override
-  void implement(Code body) => throw UnimplementedError();
-}
-
-class _AnalyzerFieldDefinition implements FieldDefinition {
+class AnalyzerFieldDeclaration implements FieldDeclaration {
   final FieldElement element;
 
-  _AnalyzerFieldDefinition(this.element);
+  AnalyzerFieldDeclaration(this.element);
 
   @override
   String get name => element.name;
 
   @override
-  TypeDefinition get type =>
-      _AnalyzerTypeDefinition(element.type.element! as TypeDefiningElement,
+  TypeDeclaration get type =>
+      AnalyzerTypeDeclaration(element.type.element! as TypeDefiningElement,
           originalReference: element.type);
 }
 
-class AnalyzerTargetFieldDefinition extends _AnalyzerFieldDefinition
-    implements TargetFieldDefinition {
-  AnalyzerTargetFieldDefinition(FieldElement element) : super(element);
+class AnalyzerFieldDefinition extends AnalyzerFieldDeclaration
+    implements FieldDefinition {
+  AnalyzerFieldDefinition(FieldElement element) : super(element);
 
   @override
-  void withInitializer(Code body) => throw UnimplementedError();
-
-  @override
-  void withGetterSetterPair(Code getter, Code setter, {Code? privateField}) =>
-      throw UnimplementedError();
+  TypeDefinition get type =>
+      AnalyzerTypeDefinition(element.type.element! as TypeDefiningElement,
+          originalReference: element.type);
 }
 
-class _AnalyzerParameterDefinition implements ParameterDefinition {
+class AnalyzerParameterDeclaration implements ParameterDeclaration {
   final ParameterElement element;
 
-  _AnalyzerParameterDefinition(this.element);
+  AnalyzerParameterDeclaration(this.element);
 
   @override
   String get name => element.name;
@@ -180,22 +212,44 @@ class _AnalyzerParameterDefinition implements ParameterDefinition {
   bool get required => element.isRequiredPositional || element.isRequiredNamed;
 
   @override
-  TypeDefinition get type =>
-      _AnalyzerTypeDefinition(element.type.element! as TypeDefiningElement,
+  TypeDeclaration get type =>
+      AnalyzerTypeDeclaration(element.type.element! as TypeDefiningElement,
           originalReference: element.type);
 }
 
-class _AnalyzerTypeParameterDefinition implements TypeParameterDefinition {
-  final TypeParameterElement element;
-
-  _AnalyzerTypeParameterDefinition(this.element);
+class AnalyzerParameterDefinition extends AnalyzerParameterDeclaration
+    implements ParameterDefinition {
+  AnalyzerParameterDefinition(ParameterElement element) : super(element);
 
   @override
-  TypeDefinition? get bounds => element.bound == null
+  TypeDefinition get type =>
+      AnalyzerTypeDefinition(element.type.element! as TypeDefiningElement,
+          originalReference: element.type);
+}
+
+class AnalyzerTypeParameterDeclaration implements TypeParameterDeclaration {
+  final TypeParameterElement element;
+
+  AnalyzerTypeParameterDeclaration(this.element);
+
+  @override
+  TypeDeclaration? get bounds => element.bound == null
       ? null
-      : _AnalyzerTypeDefinition(element.bound!.element! as TypeDefiningElement,
+      : AnalyzerTypeDeclaration(element.bound!.element! as TypeDefiningElement,
           originalReference: element.bound);
 
   @override
   String get name => element.name;
+}
+
+class AnalyzerTypeParameterDefinition extends AnalyzerTypeParameterDeclaration
+    implements TypeParameterDefinition {
+  AnalyzerTypeParameterDefinition(TypeParameterElement element)
+      : super(element);
+
+  @override
+  TypeDefinition? get bounds => element.bound == null
+      ? null
+      : AnalyzerTypeDefinition(element.bound!.element! as TypeDefiningElement,
+          originalReference: element.bound);
 }

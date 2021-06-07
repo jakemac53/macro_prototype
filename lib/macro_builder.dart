@@ -7,10 +7,11 @@ import 'package:source_gen/source_gen.dart';
 
 import 'src/analyzer.dart';
 import 'src/json.dart';
+import 'src/observable.dart';
 import 'code.dart';
 import 'macro.dart';
 
-Builder createBuilder(_) => MacroBuilder([JsonMacro()]);
+Builder createBuilder(_) => MacroBuilder([toJson, observable]);
 
 class MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
@@ -26,7 +27,7 @@ class MacroBuilder extends Builder {
     var library = await buildStep.inputLibrary;
     var buffer = StringBuffer();
     for (var topLevel in library.topLevelElements) {
-      _applyMacros(topLevel, buffer);
+      _applyMacros(topLevel, buffer, buffer);
     }
     if (buffer.isNotEmpty) {
       var outputId = buildStep.inputId.addExtension('.patch');
@@ -37,17 +38,19 @@ $buffer''', uri: outputId.uri);
     }
   }
 
-  void _applyMacros(Element element, StringBuffer buffer) {
+  void _applyMacros(
+      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
     if (element is ClassElement) {
       var classBuffer = StringBuffer();
       for (var field in element.fields) {
-        _applyMacros(field, classBuffer);
+        _applyMacros(field, classBuffer, libraryBuffer);
       }
       for (var method in element.methods) {
-        _applyMacros(method, classBuffer);
+        _applyMacros(method, classBuffer, libraryBuffer);
       }
       for (var checker in macros.keys) {
-        _maybeApplyMacro(checker, macros[checker]!, element, classBuffer);
+        _maybeApplyMacro(
+            checker, macros[checker]!, element, classBuffer, libraryBuffer);
       }
       if (classBuffer.isNotEmpty) {
         buffer.writeln('''
@@ -58,26 +61,46 @@ $classBuffer
       }
     } else {
       for (var checker in macros.keys) {
-        _maybeApplyMacro(checker, macros[checker]!, element, buffer);
+        _maybeApplyMacro(
+            checker, macros[checker]!, element, buffer, libraryBuffer);
       }
     }
   }
 
-  void _maybeApplyMacro(
-      TypeChecker checker, Macro macro, Element element, StringBuffer buffer) {
+  void _maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
+      StringBuffer buffer, StringBuffer libraryBuffer) {
     if (!checker.hasAnnotationOf(element)) return;
-    if (macro is ClassDefinitionMacro) {
+    if (macro is ClassDeclarationMacro) {
+      if (element is! ClassElement) {
+        throw ArgumentError(
+            'Macro $macro can only be used on classes, but was found on $element');
+      }
+      macro.declare(_ImplementableTargetClassDeclaration(element,
+          classBuffer: buffer, libraryBuffer: libraryBuffer));
+    } else if (macro is ClassDefinitionMacro) {
       if (element is! ClassElement) {
         throw ArgumentError(
             'Macro $macro can only be used on classes, but was found on $element');
       }
       macro.define(_ImplementableTargetClassDefinition(element, buffer));
+    } else if (macro is FieldDeclarationMacro) {
+      if (element is! FieldElement) {
+        throw ArgumentError(
+            'Macro $macro can only be used on fields, but was found on $element');
+      }
+      macro.declare(_ImplementableTargetFieldDeclaration(element, buffer));
     } else if (macro is FieldDefinitionMacro) {
       if (element is! FieldElement) {
         throw ArgumentError(
             'Macro $macro can only be used on fields, but was found on $element');
       }
       macro.define(_ImplementableTargetFieldDefinition(element, buffer));
+    } else if (macro is MethodDeclarationMacro) {
+      if (element is! MethodElement) {
+        throw ArgumentError(
+            'Macro $macro can only be used on methods, but was found on $element');
+      }
+      macro.declare(_ImplementableTargetMethodDeclaration(element, buffer));
     } else if (macro is MethodDefinitionMacro) {
       if (element is! MethodElement) {
         throw ArgumentError(
@@ -96,8 +119,42 @@ $classBuffer
       };
 }
 
-class _ImplementableTargetClassDefinition
-    extends AnalyzerTargetClassDefinition {
+class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
+    implements TargetClassDeclaration {
+  final StringBuffer _classBuffer;
+  final StringBuffer _libraryBuffer;
+
+  _ImplementableTargetClassDeclaration(ClassElement element,
+      {required StringBuffer classBuffer, required StringBuffer libraryBuffer})
+      : _classBuffer = classBuffer,
+        _libraryBuffer = libraryBuffer,
+        super(element);
+
+  @override
+  Iterable<TargetFieldDeclaration> get fields sync* {
+    var e = element as ClassElement;
+    for (var field in e.fields) {
+      yield _ImplementableTargetFieldDeclaration(field, _classBuffer);
+    }
+  }
+
+  @override
+  Iterable<TargetMethodDeclaration> get methods sync* {
+    var e = element as ClassElement;
+    for (var method in e.methods) {
+      yield _ImplementableTargetMethodDeclaration(method, _classBuffer);
+    }
+  }
+
+  @override
+  void addToClass(Code declaration) => _classBuffer.writeln(declaration);
+
+  @override
+  void addToLibrary(Code declaration) => _libraryBuffer.writeln(declaration);
+}
+
+class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
+    implements TargetClassDefinition {
   final StringBuffer _buffer;
 
   _ImplementableTargetClassDefinition(ClassElement element, this._buffer)
@@ -120,61 +177,100 @@ class _ImplementableTargetClassDefinition
   }
 }
 
-class _ImplementableTargetFieldDefinition
-    extends AnalyzerTargetFieldDefinition {
+class _ImplementableTargetFieldDeclaration extends AnalyzerFieldDeclaration
+    implements TargetFieldDeclaration {
+  final StringBuffer _classBuffer;
+  _ImplementableTargetFieldDeclaration(FieldElement element, this._classBuffer)
+      : super(element);
+
+  @override
+  void addToClass(Code declaration) => _classBuffer.writeln(declaration);
+}
+
+class _ImplementableTargetFieldDefinition extends AnalyzerFieldDefinition
+    implements TargetFieldDefinition {
   final StringBuffer _buffer;
 
   _ImplementableTargetFieldDefinition(FieldElement element, this._buffer)
       : super(element);
 
   @override
-  void withInitializer(Code body) => throw UnimplementedError();
+  void withInitializer(Code body, {List<Code>? supportingDeclarations}) {
+    _buffer.writeln('''
+@patch
+${type.toCode()} ${name} = $body;''');
+    supportingDeclarations?.forEach(_buffer.writeln);
+  }
 
   @override
-  void withGetterSetterPair(Code getter, Code setter, {Code? privateField}) =>
-      throw UnimplementedError();
+  void withGetterSetterPair(Code getter, Code setter,
+      {List<Code>? supportingDeclarations}) {
+    _buffer.writeln('''
+@patch
+$getter
+@patch
+$setter''');
+    supportingDeclarations?.forEach(_buffer.writeln);
+  }
 }
 
-class _ImplementableTargetMethodDefinition
-    extends AnalyzerTargetMethodDefinition {
+class _ImplementableTargetMethodDeclaration extends AnalyzerMethodDeclaration
+    implements TargetMethodDeclaration {
+  final StringBuffer _buffer;
+
+  _ImplementableTargetMethodDeclaration(MethodElement element, this._buffer)
+      : super(element);
+
+  @override
+  void addToClass(Code declaration) => _buffer.writeln(declaration);
+}
+
+class _ImplementableTargetMethodDefinition extends AnalyzerMethodDefinition
+    implements TargetMethodDefinition {
   final StringBuffer _buffer;
 
   _ImplementableTargetMethodDefinition(MethodElement element, this._buffer)
       : super(element);
 
   @override
-  void implement(Code code) {
-    String writeType(TypeDeclaration d) {
-      var type = StringBuffer(d.name);
-      if (d.typeArguments.isNotEmpty) {
-        type.write('<');
-        var types = [];
-        for (var typeArg in d.typeArguments) {
-          types.add(writeType(typeArg));
-        }
-        type.write(types.join(', '));
-        type.write('>');
-      }
-      if (d.isNullable) type.write('?');
-      return type.toString();
-    }
-
+  void implement(Code code, {List<Code>? supportingDeclarations}) {
     _buffer.writeln('''
 @patch
-${writeType(returnType)} ${name}(
+${returnType.toCode()} ${name}(
 ''');
     for (var positional in positionalParameters) {
-      _buffer.writeln('${writeType(positional.type)} ${positional.name},');
+      _buffer.writeln('${positional.type.toCode()} ${positional.name},');
     }
     if (namedParameters.isNotEmpty) {
       _buffer.write(' {');
       for (var named in namedParameters.values) {
         _buffer.writeln(
-            '${named.required ? 'required ' : ''}${writeType(named.type)} ${named.name},');
+            '${named.required ? 'required ' : ''}${named.type.toCode()} ${named.name},');
       }
       _buffer.writeln('}');
     }
     _buffer.write(')');
     _buffer.write('$code');
+
+    supportingDeclarations?.forEach(_buffer.writeln);
+  }
+}
+
+extension ToCode on TypeDeclaration {
+  // Recreates a string for the type declaration `d`, with type arguments if
+  // present as well as retaining `?` markers.
+  String toCode() {
+    var type = StringBuffer(name);
+    if (typeArguments.isNotEmpty) {
+      type.write('<');
+      var types = [];
+      for (var typeArg in typeArguments) {
+        types.add(typeArg.toCode());
+      }
+      type.write(types.join(', '));
+      type.write('>');
+    }
+    if (isNullable) type.write('?');
+    return type.toString();
   }
 }
