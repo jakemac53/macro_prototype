@@ -45,10 +45,6 @@ abstract class TypeReference {
 
   // The scope where the type reference should be resolved from.
   Scope get scope;
-
-  Iterable<TypeReference> get typeArguments;
-
-  Iterable<TypeParameterType> get typeParameters;
 }
 
 abstract class TypeDeclaration implements TypeReference {

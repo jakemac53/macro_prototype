@@ -11,9 +11,12 @@ import 'src/observable.dart';
 import 'code.dart';
 import 'macro.dart';
 
-Builder createBuilder(_) => MacroBuilder([toJson, observable]);
+Builder typesBuilder(_) => TypesMacroBuilder([toJson, observable]);
+Builder declarationsBuilder(_) =>
+    DeclarationsMacroBuilder([toJson, observable]);
+Builder defintionsBuilder(_) => DefinitionsMacroBuilder([toJson, observable]);
 
-class MacroBuilder extends Builder {
+abstract class MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
 
   MacroBuilder(Iterable<Macro> macros)
@@ -49,7 +52,7 @@ $buffer''', uri: outputId.uri);
         _applyMacros(method, classBuffer, libraryBuffer);
       }
       for (var checker in macros.keys) {
-        _maybeApplyMacro(
+        maybeApplyMacro(
             checker, macros[checker]!, element, classBuffer, libraryBuffer);
       }
       if (classBuffer.isNotEmpty) {
@@ -61,13 +64,46 @@ $classBuffer
       }
     } else {
       for (var checker in macros.keys) {
-        _maybeApplyMacro(
+        maybeApplyMacro(
             checker, macros[checker]!, element, buffer, libraryBuffer);
       }
     }
   }
 
-  void _maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
+  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
+      StringBuffer buffer, StringBuffer libraryBuffer);
+}
+
+class TypesMacroBuilder extends MacroBuilder {
+  TypesMacroBuilder(Iterable<Macro> macros) : super(macros);
+
+  @override
+  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
+      StringBuffer buffer, StringBuffer libraryBuffer) {
+    if (!checker.hasAnnotationOf(element)) return;
+    if (macro is ClassTypeMacro) {
+      if (element is! ClassElement) {
+        throw ArgumentError(
+            'Macro $macro can only be used on classes, but was found on $element');
+      }
+      macro.type(_ImplementableTargetClassType(element, libraryBuffer));
+    }
+
+    throw UnsupportedError(
+        'This prototype doesn\'t support phase 1 (type) macros');
+  }
+
+  @override
+  Map<String, List<String>> get buildExtensions => {
+        ".gen.dart": [".types.dart."]
+      };
+}
+
+class DeclarationsMacroBuilder extends MacroBuilder {
+  DeclarationsMacroBuilder(Iterable<Macro> macros) : super(macros);
+
+  @override
+  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
       StringBuffer buffer, StringBuffer libraryBuffer) {
     if (!checker.hasAnnotationOf(element)) return;
     if (macro is ClassDeclarationMacro) {
@@ -77,13 +113,8 @@ $classBuffer
       }
       macro.declare(_ImplementableTargetClassDeclaration(element,
           classBuffer: buffer, libraryBuffer: libraryBuffer));
-    } else if (macro is ClassDefinitionMacro) {
-      if (element is! ClassElement) {
-        throw ArgumentError(
-            'Macro $macro can only be used on classes, but was found on $element');
-      }
-      macro.define(_ImplementableTargetClassDefinition(element, buffer));
-    } else if (macro is FieldDeclarationMacro) {
+    }
+    if (macro is FieldDeclarationMacro) {
       if (element is! FieldElement) {
         throw ArgumentError(
             'Macro $macro can only be used on fields, but was found on $element');
@@ -101,22 +132,67 @@ $classBuffer
             'Macro $macro can only be used on methods, but was found on $element');
       }
       macro.declare(_ImplementableTargetMethodDeclaration(element, buffer));
+    }
+  }
+
+  @override
+  Map<String, List<String>> get buildExtensions => {
+        ".types.dart.": [".declaration.dart."]
+      };
+}
+
+class DefinitionsMacroBuilder extends MacroBuilder {
+  DefinitionsMacroBuilder(Iterable<Macro> macros) : super(macros);
+
+  @override
+  void maybeApplyMacro(TypeChecker checker, Macro macro, Element element,
+      StringBuffer buffer, StringBuffer libraryBuffer) {
+    if (!checker.hasAnnotationOf(element)) return;
+    if (macro is ClassDefinitionMacro) {
+      if (element is! ClassElement) {
+        throw ArgumentError(
+            'Macro $macro can only be used on classes, but was found on $element');
+      }
+      macro.define(_ImplementableTargetClassDefinition(element, buffer));
+    } else if (macro is FieldDefinitionMacro) {
+      if (element is! FieldElement) {
+        throw ArgumentError(
+            'Macro $macro can only be used on fields, but was found on $element');
+      }
+      macro.define(_ImplementableTargetFieldDefinition(element, buffer));
     } else if (macro is MethodDefinitionMacro) {
       if (element is! MethodElement) {
         throw ArgumentError(
             'Macro $macro can only be used on methods, but was found on $element');
       }
       macro.define(_ImplementableTargetMethodDefinition(element, buffer));
-    } else {
-      throw UnsupportedError(
-          'This prototype only supports phase 3 (definition) macros');
     }
   }
 
   @override
   Map<String, List<String>> get buildExtensions => {
-        '.dart': ['.dart.patch'],
+        ".declaration.dart.": [".dart."]
       };
+}
+
+class _ImplementableTargetClassType extends AnalyzerTypeReference
+    implements TargetClassType {
+  final StringBuffer _libraryBuffer;
+
+  ClassElement get element => super.element as ClassElement;
+
+  _ImplementableTargetClassType(ClassElement element, this._libraryBuffer)
+      : super(element);
+
+  Iterable<TypeReference> get superinterfaces sync* {
+    for (var interface in element.allSupertypes) {
+      yield AnalyzerTypeReference(interface.element,
+          originalReference: interface);
+    }
+  }
+
+  @override
+  void addTypeToLibary(Code declaration) => _libraryBuffer.writeln(declaration);
 }
 
 class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration

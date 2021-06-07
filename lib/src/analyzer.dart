@@ -5,24 +5,31 @@ import 'package:analyzer/dart/element/type.dart';
 import '../code.dart';
 import '../macro.dart';
 
-class AnalyzerTypeDeclaration implements TypeDeclaration {
+class AnalyzerTypeReference implements TypeReference {
   final TypeDefiningElement element;
   final DartType? originalReference;
 
-  AnalyzerTypeDeclaration(this.element, {this.originalReference});
+  AnalyzerTypeReference(this.element, {this.originalReference});
 
   @override
   bool get isNullable =>
       originalReference?.nullabilitySuffix == NullabilitySuffix.question;
 
   @override
-  bool isSubtype(TypeDeclaration other) => throw UnimplementedError();
-
-  @override
   String get name => element.name!;
 
   @override
   Scope get scope => throw UnimplementedError();
+}
+
+class AnalyzerTypeDeclaration extends AnalyzerTypeReference
+    implements TypeDeclaration {
+  AnalyzerTypeDeclaration(TypeDefiningElement element,
+      {DartType? originalReference})
+      : super(element, originalReference: originalReference);
+
+  @override
+  bool isSubtype(TypeDeclaration other) => throw UnimplementedError();
 
   @override
   Iterable<TypeDeclaration> get typeArguments sync* {
