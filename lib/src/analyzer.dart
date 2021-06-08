@@ -2,8 +2,8 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 
-import '../code.dart';
-import '../macro.dart';
+import 'code.dart';
+import 'macro.dart';
 
 class AnalyzerTypeReference implements TypeReference {
   final TypeDefiningElement element;

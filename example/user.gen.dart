@@ -1,5 +1,5 @@
-import 'package:macro_builder/src/json.dart';
-import 'package:macro_builder/src/observable.dart';
+import 'macros/json.dart';
+import 'macros/observable.dart';
 
 @toJson
 class User {

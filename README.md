@@ -4,12 +4,11 @@ This is a basic prototype for 3 phase macros using package:build.
 
 ## Writing a macro
 
-To create a new macro see the example one at `lib/src/json.dart` or
-`lib/src/observable`. Once you create a builder you will need to add it to all
-the phases in which it should run, see the `typesBuilder`,
-`declarationsBuilder`, and `definitionsBuilder` methods in
-`macro_builder.dart`, and to pass in your new macro to the corresponding
-constructor.
+To create a new macro see the examples under `example/macros`. Once you create
+a builder you will need to add it to all the phases in which it should run, see
+the `typesBuilder`, `declarationsBuilder`, and `definitionsBuilder` methods in
+`example/builders.dart`, and pass in your new macro to the corresponding
+constructor for the phase in which it should run.
 
 ## Creating an example
 

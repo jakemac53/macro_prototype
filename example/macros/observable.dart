@@ -1,6 +1,4 @@
-import '../code.dart';
-import '../macro.dart';
-import '../macro_builder.dart';
+import 'package:macro_builder/macro_builder.dart';
 
 const observable = ObservableMacro();
 

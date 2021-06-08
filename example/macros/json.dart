@@ -1,7 +1,6 @@
 import 'package:collection/collection.dart';
 
-import '../code.dart';
-import '../macro.dart';
+import 'package:macro_builder/macro_builder.dart';
 
 const toJson = JsonMacro();
 
@@ -20,6 +19,5 @@ class JsonMacro implements ClassDefinitionMacro {
     }
     code = Code('$code};');
     toJsonMethod.implement(code);
-    print('\n$code');
   }
 }

@@ -1,20 +1,19 @@
 import 'dart:async';
+import 'dart:mirrors';
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
+import 'package:path/path.dart' as p;
 import 'package:source_gen/source_gen.dart';
 
 import 'src/analyzer.dart';
-import 'src/json.dart';
-import 'src/observable.dart';
-import 'code.dart';
-import 'macro.dart';
+import 'src/code.dart';
+import 'src/macro.dart';
 
-Builder typesBuilder(_) => TypesMacroBuilder([]);
-Builder declarationsBuilder(_) => DeclarationsMacroBuilder([]);
-Builder definitionsBuilder(_) => DefinitionsMacroBuilder([toJson, observable]);
+export 'src/code.dart';
+export 'src/macro.dart';
 
 abstract class MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
@@ -29,7 +28,7 @@ abstract class MacroBuilder extends Builder {
       Iterable<Macro> macros, this._inputExtension, this._outputExtension)
       : macros = {
           for (var macro in macros)
-            TypeChecker.fromRuntime(macro.runtimeType): macro,
+            TypeChecker.fromUrl(_assetUrlFor(macro)): macro,
         };
 
   @override
@@ -393,4 +392,11 @@ extension ToCode on TypeDeclaration {
     if (isNullable) type.write('?');
     return type.toString();
   }
+}
+
+String _assetUrlFor(Macro macro) {
+  var mirror = reflectClass(macro.runtimeType);
+  var uri = (mirror.owner as LibraryMirror).uri;
+  var relative = p.relative(uri.path);
+  return 'asset:macro_builder/$relative#${MirrorSystem.getName(mirror.simpleName)}';
 }
