@@ -18,3 +18,14 @@ class User {
     this.name = name;
   }
 }
+
+@toJson
+class Group {
+  Map<String, Object?> toJson() => <String, Object?>{
+        "name": name,
+        "users": [for (var e in users) e.toJson()],
+      };
+  final String name;
+  final List<User> users;
+  Group({this.name = '', this.users = const []});
+}

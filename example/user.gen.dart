@@ -10,6 +10,12 @@ class User {
     // TODO: ugly - can't used field initializing formals etc
     this.name = name;
   }
+}
 
-  external Map<String, Object?> toJson();
+@toJson
+class Group {
+  final String name;
+  final List<User> users;
+
+  Group({this.name = '', this.users = const []});
 }

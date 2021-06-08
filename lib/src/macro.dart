@@ -56,11 +56,15 @@ abstract class TypeDeclaration implements TypeReference {
 }
 
 abstract class TypeDefinition implements TypeDeclaration {
-  Iterable<TypeDefinition> get superinterfaces;
+  Iterable<FieldDefinition> get fields;
 
   Iterable<MethodDefinition> get methods;
 
-  Iterable<FieldDefinition> get fields;
+  Iterable<TypeDefinition> get superinterfaces;
+
+  Iterable<TypeDefinition> get typeArguments;
+
+  Iterable<TypeParameterDefinition> get typeParameters;
 }
 
 abstract class TargetClassType implements TypeReference {
