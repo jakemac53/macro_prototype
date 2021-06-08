@@ -10,9 +10,11 @@ abstract class TypeDeclaration implements TypeReference {
 }
 
 abstract class TargetClassDeclaration implements TypeDeclaration {
-  Iterable<TargetMethodDeclaration> get methods;
+  Iterable<TargetMethodDeclaration> get constructors;
 
   Iterable<TargetFieldDeclaration> get fields;
+
+  Iterable<TargetMethodDeclaration> get methods;
 
   void addToClass(Code declaration);
 

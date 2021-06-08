@@ -189,6 +189,72 @@ class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
   }
 }
 
+class AnalyzerConstructorDeclaration implements MethodDeclaration {
+  final ConstructorElement element;
+
+  AnalyzerConstructorDeclaration(this.element);
+
+  @override
+  String get name => element.name;
+
+  @override
+  Map<String, ParameterDeclaration> get namedParameters => {
+        for (var param in element.parameters)
+          if (param.isNamed) param.name: AnalyzerParameterDeclaration(param),
+      };
+
+  @override
+  Iterable<ParameterDeclaration> get positionalParameters sync* {
+    for (var param in element.parameters) {
+      if (!param.isPositional) continue;
+      yield AnalyzerParameterDeclaration(param);
+    }
+  }
+
+  @override
+  TypeDeclaration get returnType =>
+      AnalyzerTypeDeclaration(element.returnType.element,
+          originalReference: element.returnType);
+
+  @override
+  Iterable<TypeParameterDeclaration> get typeParameters sync* {
+    for (var typeParam in element.typeParameters) {
+      yield AnalyzerTypeParameterDeclaration(typeParam);
+    }
+  }
+}
+
+class AnalyzerConstructorDefinition extends AnalyzerConstructorDeclaration
+    implements MethodDefinition {
+  AnalyzerConstructorDefinition(ConstructorElement element) : super(element);
+
+  @override
+  Map<String, ParameterDefinition> get namedParameters => {
+        for (var param in element.parameters)
+          if (param.isNamed) param.name: AnalyzerParameterDefinition(param),
+      };
+
+  @override
+  Iterable<ParameterDefinition> get positionalParameters sync* {
+    for (var param in element.parameters) {
+      if (!param.isPositional) continue;
+      yield AnalyzerParameterDefinition(param);
+    }
+  }
+
+  @override
+  TypeDefinition get returnType =>
+      AnalyzerTypeDefinition(element.returnType.element,
+          originalReference: element.returnType);
+
+  @override
+  Iterable<TypeParameterDefinition> get typeParameters sync* {
+    for (var typeParam in element.typeParameters) {
+      yield AnalyzerTypeParameterDefinition(typeParam);
+    }
+  }
+}
+
 class AnalyzerFieldDeclaration implements FieldDeclaration {
   final FieldElement element;
 

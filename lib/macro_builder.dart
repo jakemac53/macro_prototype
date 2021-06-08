@@ -252,6 +252,15 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
         super(element);
 
   @override
+  Iterable<TargetMethodDeclaration> get constructors sync* {
+    var e = element as ClassElement;
+    for (var constructor in e.constructors) {
+      yield _ImplementableTargetConstructorDeclaration(
+          constructor, _classBuffer);
+    }
+  }
+
+  @override
   Iterable<TargetFieldDeclaration> get fields sync* {
     var e = element as ClassElement;
     for (var field in e.fields) {
@@ -283,6 +292,14 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
 
   _ImplementableTargetClassDefinition(ClassElement element, this._buffer)
       : super(element);
+
+  @override
+  Iterable<TargetMethodDefinition> get constructors sync* {
+    var e = element as ClassElement;
+    for (var constructor in e.constructors) {
+      yield _ImplementableTargetConstructorDefinition(constructor, _buffer);
+    }
+  }
 
   @override
   Iterable<TargetFieldDefinition> get fields sync* {
@@ -356,6 +373,50 @@ class _ImplementableTargetMethodDefinition extends AnalyzerMethodDefinition
   final _ImplementableTargetClassDefinition? parentClass;
 
   _ImplementableTargetMethodDefinition(MethodElement element, this._buffer,
+      {this.parentClass})
+      : super(element);
+
+  @override
+  void implement(Code code, {List<Code>? supportingDeclarations}) {
+    parentClass?._implementedDeclarations.add(name);
+    _buffer.writeln('${returnType.toCode()} ${name}(');
+    for (var positional in positionalParameters) {
+      _buffer.writeln('${positional.type.toCode()} ${positional.name},');
+    }
+    if (namedParameters.isNotEmpty) {
+      _buffer.write(' {');
+      for (var named in namedParameters.values) {
+        _buffer.writeln(
+            '${named.required ? 'required ' : ''}${named.type.toCode()} ${named.name},');
+      }
+      _buffer.writeln('}');
+    }
+    _buffer.write(')');
+    _buffer.write('$code');
+
+    supportingDeclarations?.forEach(_buffer.writeln);
+  }
+}
+
+class _ImplementableTargetConstructorDeclaration
+    extends AnalyzerConstructorDeclaration implements TargetMethodDeclaration {
+  final StringBuffer _buffer;
+
+  _ImplementableTargetConstructorDeclaration(
+      ConstructorElement element, this._buffer)
+      : super(element);
+
+  @override
+  void addToClass(Code declaration) => _buffer.writeln(declaration);
+}
+
+class _ImplementableTargetConstructorDefinition
+    extends AnalyzerConstructorDefinition implements TargetMethodDefinition {
+  final StringBuffer _buffer;
+  final _ImplementableTargetClassDefinition? parentClass;
+
+  _ImplementableTargetConstructorDefinition(
+      ConstructorElement element, this._buffer,
       {this.parentClass})
       : super(element);
 

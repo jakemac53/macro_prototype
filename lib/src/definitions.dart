@@ -14,6 +14,8 @@ abstract class TypeDefinition implements TypeDeclaration {
 }
 
 abstract class TargetClassDefinition implements TypeDefinition {
+  Iterable<TargetMethodDefinition> get constructors;
+
   Iterable<TargetMethodDefinition> get methods;
 
   Iterable<TargetFieldDefinition> get fields;
