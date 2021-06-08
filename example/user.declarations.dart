@@ -1,27 +1,26 @@
 import 'macros/json.dart';
-import 'macros/observable.dart';
 
-@toJson
+@jsonSerializable
 class User {
   external Map<String, Object?> toJson();
-  @observable
-  external String name;
-  User(String name) {
-    this.name = name;
-  }
+  external User.fromJson(Map<String, Object?> json);
+  String name;
+  User(this.name);
 }
 
-@toJson
+@jsonSerializable
 class Group {
   external Map<String, Object?> toJson();
+  external Group.fromJson(Map<String, Object?> json);
   final String name;
   final List<User> users;
   Group(this.name, this.users);
 }
 
-@toJson
+@jsonSerializable
 class Manager extends User {
   external Map<String, Object?> toJson();
+  external Manager.fromJson(Map<String, Object?> json);
   final List<User> reports;
   Manager(String name, this.reports) : super(name);
 }

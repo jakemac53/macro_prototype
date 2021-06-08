@@ -5,5 +5,6 @@ import 'macros/json.dart';
 import 'macros/observable.dart';
 
 Builder typesBuilder(_) => TypesMacroBuilder([]);
-Builder declarationsBuilder(_) => DeclarationsMacroBuilder([toJson]);
-Builder definitionsBuilder(_) => DefinitionsMacroBuilder([toJson, observable]);
+Builder declarationsBuilder(_) => DeclarationsMacroBuilder([jsonSerializable]);
+Builder definitionsBuilder(_) =>
+    DefinitionsMacroBuilder([jsonSerializable, observable]);

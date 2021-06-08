@@ -1,26 +1,26 @@
 import 'macros/json.dart';
-import 'macros/observable.dart';
 
-@toJson
+@jsonSerializable
 class User {
+  User.fromJson(
+    Map<String, Object?> json,
+  ) : name = json["name"] as String;
   Map<String, Object?> toJson() => <String, Object?>{
         "name": name,
       };
-  String get name => _name;
-  void set name(String val) {
-    print('Setting name to ${val}');
-    _name = val;
-  }
-
-  late String _name;
-
-  User(String name) {
-    this.name = name;
-  }
+  String name;
+  User(this.name);
 }
 
-@toJson
+@jsonSerializable
 class Group {
+  Group.fromJson(
+    Map<String, Object?> json,
+  )   : name = json["name"] as String,
+        users = [
+          for (var e in json["users"] as List<Object?>)
+            User.fromJson(e as Map<String, Object?>)
+        ];
   Map<String, Object?> toJson() => <String, Object?>{
         "name": name,
         "users": [for (var e in users) e.toJson()],
@@ -30,8 +30,15 @@ class Group {
   Group(this.name, this.users);
 }
 
-@toJson
+@jsonSerializable
 class Manager extends User {
+  Manager.fromJson(
+    Map<String, Object?> json,
+  )   : reports = [
+          for (var e in json["reports"] as List<Object?>)
+            User.fromJson(e as Map<String, Object?>)
+        ],
+        super.fromJson(json);
   Map<String, Object?> toJson() => <String, Object?>{
         "reports": [for (var e in reports) e.toJson()],
         "name": name,

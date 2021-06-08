@@ -67,6 +67,16 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
       : super(element, originalReference: originalReference);
 
   @override
+  Iterable<MethodDefinition> get constructors sync* {
+    var e = element;
+    if (e is ClassElement) {
+      for (var constructor in e.constructors) {
+        yield AnalyzerConstructorDefinition(constructor);
+      }
+    }
+  }
+
+  @override
   Iterable<FieldDefinition> get fields sync* {
     var e = element;
     if (e is ClassElement) {
@@ -86,6 +96,16 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
       for (var method in e.methods) {
         yield AnalyzerMethodDefinition(method);
       }
+    }
+  }
+
+  @override
+  TypeDefinition? get superclass {
+    var e = element;
+    if (e is ClassElement && !e.isDartCoreObject) {
+      var superType = e.supertype!;
+      return AnalyzerTypeDefinition(superType.element,
+          originalReference: superType);
     }
   }
 

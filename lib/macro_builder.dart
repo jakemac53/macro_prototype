@@ -297,7 +297,8 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
   Iterable<TargetMethodDefinition> get constructors sync* {
     var e = element as ClassElement;
     for (var constructor in e.constructors) {
-      yield _ImplementableTargetConstructorDefinition(constructor, _buffer);
+      yield _ImplementableTargetConstructorDefinition(
+          constructor, _buffer, this);
     }
   }
 
@@ -413,17 +414,16 @@ class _ImplementableTargetConstructorDeclaration
 class _ImplementableTargetConstructorDefinition
     extends AnalyzerConstructorDefinition implements TargetMethodDefinition {
   final StringBuffer _buffer;
-  final _ImplementableTargetClassDefinition? parentClass;
+  final _ImplementableTargetClassDefinition parentClass;
 
   _ImplementableTargetConstructorDefinition(
-      ConstructorElement element, this._buffer,
-      {this.parentClass})
+      ConstructorElement element, this._buffer, this.parentClass)
       : super(element);
 
   @override
   void implement(Code code, {List<Code>? supportingDeclarations}) {
-    parentClass?._implementedDeclarations.add(name);
-    _buffer.writeln('${returnType.toCode()} ${name}(');
+    parentClass._implementedDeclarations.add(name);
+    _buffer.writeln('${parentClass.name}.${name}(');
     for (var positional in positionalParameters) {
       _buffer.writeln('${positional.type.toCode()} ${positional.name},');
     }
