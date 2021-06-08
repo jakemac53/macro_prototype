@@ -9,11 +9,17 @@ import 'package:path/path.dart' as p;
 import 'package:source_gen/source_gen.dart';
 
 import 'src/analyzer.dart';
+import 'src/declarations.dart';
+import 'src/definitions.dart';
 import 'src/code.dart';
 import 'src/macro.dart';
+import 'src/types.dart';
 
 export 'src/code.dart';
+export 'src/declarations.dart';
+export 'src/definitions.dart';
 export 'src/macro.dart';
+export 'src/types.dart';
 
 abstract class _MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
@@ -132,7 +138,7 @@ abstract class _MacroBuilder extends Builder {
 }
 
 class TypesMacroBuilder extends _MacroBuilder {
-  TypesMacroBuilder(Iterable<Macro> macros)
+  TypesMacroBuilder(Iterable<TypeMacro> macros)
       : super(macros, '.gen.dart', '.types.dart');
 
   @override
@@ -150,7 +156,7 @@ class TypesMacroBuilder extends _MacroBuilder {
 }
 
 class DeclarationsMacroBuilder extends _MacroBuilder {
-  DeclarationsMacroBuilder(Iterable<Macro> macros)
+  DeclarationsMacroBuilder(Iterable<DeclarationMacro> macros)
       : super(macros, '.types.dart', '.declarations.dart');
 
   @override
@@ -183,7 +189,7 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
 }
 
 class DefinitionsMacroBuilder extends _MacroBuilder {
-  DefinitionsMacroBuilder(Iterable<Macro> macros)
+  DefinitionsMacroBuilder(Iterable<DefinitionMacro> macros)
       : super(macros, '.declarations.dart', '.dart');
 
   @override

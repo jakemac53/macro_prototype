@@ -3,7 +3,9 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 
 import 'code.dart';
-import 'macro.dart';
+import 'definitions.dart';
+import 'declarations.dart';
+import 'types.dart';
 
 class AnalyzerTypeReference implements TypeReference {
   final TypeDefiningElement element;
@@ -20,6 +22,10 @@ class AnalyzerTypeReference implements TypeReference {
 
   @override
   Scope get scope => throw UnimplementedError();
+
+  @override
+  // TODO: Scope, once we have that
+  Code get reference => Code('$name${isNullable ? '?' : ''}');
 }
 
 class AnalyzerTypeDeclaration extends AnalyzerTypeReference
