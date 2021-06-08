@@ -15,7 +15,7 @@ import 'src/macro.dart';
 export 'src/code.dart';
 export 'src/macro.dart';
 
-abstract class MacroBuilder extends Builder {
+abstract class _MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
   final String _inputExtension;
   final String _outputExtension;
@@ -24,7 +24,7 @@ abstract class MacroBuilder extends Builder {
         _inputExtension: [_outputExtension]
       };
 
-  MacroBuilder(
+  _MacroBuilder(
       Iterable<Macro> macros, this._inputExtension, this._outputExtension)
       : macros = {
           for (var macro in macros)
@@ -131,7 +131,7 @@ abstract class MacroBuilder extends Builder {
       Element element, StringBuffer buffer, StringBuffer libraryBuffer);
 }
 
-class TypesMacroBuilder extends MacroBuilder {
+class TypesMacroBuilder extends _MacroBuilder {
   TypesMacroBuilder(Iterable<Macro> macros)
       : super(macros, '.gen.dart', '.types.dart');
 
@@ -149,7 +149,7 @@ class TypesMacroBuilder extends MacroBuilder {
   }
 }
 
-class DeclarationsMacroBuilder extends MacroBuilder {
+class DeclarationsMacroBuilder extends _MacroBuilder {
   DeclarationsMacroBuilder(Iterable<Macro> macros)
       : super(macros, '.types.dart', '.declarations.dart');
 
@@ -182,7 +182,7 @@ class DeclarationsMacroBuilder extends MacroBuilder {
   }
 }
 
-class DefinitionsMacroBuilder extends MacroBuilder {
+class DefinitionsMacroBuilder extends _MacroBuilder {
   DefinitionsMacroBuilder(Iterable<Macro> macros)
       : super(macros, '.declarations.dart', '.dart');
 
