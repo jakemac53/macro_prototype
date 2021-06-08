@@ -7,7 +7,8 @@ class ObservableMacro implements FieldDefinitionMacro {
 
   void define(TargetFieldDefinition definition) {
     var backingFieldName = ' _${definition.name}';
-    var backingField = Code('${definition.type.toCode()} $backingFieldName;');
+    var backingField =
+        Code('late ${definition.type.toCode()} $backingFieldName;');
     var getter = Code('${definition.type.toCode()} get ${definition.name} => '
         '$backingFieldName;');
     var setter = Code('''

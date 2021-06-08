@@ -6,15 +6,15 @@ class User {
   Map<String, Object?> toJson() => <String, Object?>{
         "name": name,
       };
-  String? get name => _name;
-  void set name(String? val) {
+  String get name => _name;
+  void set name(String val) {
     print('Setting name to ${val}');
     _name = val;
   }
 
-  String? _name;
+  late String _name;
 
-  User({String? name}) {
+  User(String name) {
     this.name = name;
   }
 }
@@ -27,5 +27,15 @@ class Group {
       };
   final String name;
   final List<User> users;
-  Group({this.name = '', this.users = const []});
+  Group(this.name, this.users);
+}
+
+@toJson
+class Manager extends User {
+  Map<String, Object?> toJson() => <String, Object?>{
+        "reports": [for (var e in reports) e.toJson()],
+        "name": name,
+      };
+  final List<User> reports;
+  Manager(String name, this.reports) : super(name);
 }

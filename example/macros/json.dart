@@ -14,7 +14,12 @@ class _ToJsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
   void define(TargetClassDefinition definition) {
     var toJsonMethod = definition.methods.firstWhere((m) => m.name == 'toJson');
     var code = Code('=> <String, Object?>{\n');
-    for (var field in definition.fields) {
+    var allFields = [
+      for (var interface in definition.superinterfaces)
+        if (interface.name != 'Object') ...interface.fields,
+      ...definition.fields,
+    ];
+    for (var field in allFields) {
       code = Code(
           '$code  "${field.name}": ${_typeToJson(field.type, Code(field.name))},\n');
     }

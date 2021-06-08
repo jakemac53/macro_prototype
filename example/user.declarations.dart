@@ -5,8 +5,8 @@ import 'macros/observable.dart';
 class User {
   external Map<String, Object?> toJson();
   @observable
-  external String? name;
-  User({String? name}) {
+  external String name;
+  User(String name) {
     this.name = name;
   }
 }
@@ -16,5 +16,12 @@ class Group {
   external Map<String, Object?> toJson();
   final String name;
   final List<User> users;
-  Group({this.name = '', this.users = const []});
+  Group(this.name, this.users);
+}
+
+@toJson
+class Manager extends User {
+  external Map<String, Object?> toJson();
+  final List<User> reports;
+  Manager(String name, this.reports) : super(name);
 }
