@@ -160,7 +160,7 @@ class TypesMacroBuilder extends _MacroBuilder {
         throw ArgumentError(
             'Macro $macro can only be used on classes, but was found on $element');
       }
-      macro.type(_ImplementableTargetClassType(element, libraryBuffer));
+      macro.forClassType(_ImplementableTargetClassType(element, libraryBuffer));
     }
   }
 }
@@ -178,27 +178,31 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       StringBuffer buffer,
       StringBuffer libraryBuffer) async {
     if (!checker.hasAnnotationOf(element)) return null;
-    if (macro is ClassDeclarationMacro) {
-      if (element is! ClassElement) {
+    if (element is ClassElement) {
+      if (macro is! ClassDeclarationMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on classes, but was found on $element');
+            'Macro $macro was found on $element but isn\'t intended to be used '
+            ' on that type of declaration.');
       }
-      macro.declare(_ImplementableTargetClassDeclaration(element,
+      macro.forClassDeclaration(_ImplementableTargetClassDeclaration(element,
           classBuffer: buffer, libraryBuffer: libraryBuffer));
       // TODO: return list of names of declarations modified
-    }
-    if (macro is FieldDeclarationMacro) {
-      if (element is! FieldElement) {
+    } else if (element is FieldElement) {
+      if (macro is! FieldDeclarationMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on fields, but was found on $element');
+            'Macro $macro was found on $element but isn\'t intended to be used '
+            ' on that type of declaration.');
       }
-      macro.declare(_ImplementableTargetFieldDeclaration(element, buffer));
-    } else if (macro is MethodDeclarationMacro) {
-      if (element is! MethodElement) {
+      macro.forFieldDeclaration(
+          _ImplementableTargetFieldDeclaration(element, buffer));
+    } else if (element is MethodElement) {
+      if (macro is! MethodDeclarationMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on methods, but was found on $element');
+            'Macro $macro was found on $element but isn\'t intended to be used '
+            ' on that type of declaration.');
       }
-      macro.declare(_ImplementableTargetMethodDeclaration(element, buffer));
+      macro.forMethodDeclaration(
+          _ImplementableTargetMethodDeclaration(element, buffer));
     }
   }
 }
@@ -222,7 +226,7 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
             'Macro $macro can only be used on classes, but was found on $element');
       }
       var targetClass = _ImplementableTargetClassDefinition(element, buffer);
-      macro.define(targetClass);
+      macro.forClassDefinition(targetClass);
       return targetClass._implementedDeclarations;
     } else if (macro is FieldDefinitionMacro) {
       if (element is! FieldElement) {
@@ -230,7 +234,8 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
             'Macro $macro can only be used on fields, but was found on $element');
       }
       var fieldBuffer = StringBuffer();
-      macro.define(_ImplementableTargetFieldDefinition(element, buffer));
+      macro.forFieldDefinition(
+          _ImplementableTargetFieldDefinition(element, buffer));
       if (fieldBuffer.isNotEmpty) {
         var node = (await resolver.astNodeFor(element, resolve: true))!
             .parent!
@@ -246,7 +251,8 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
             'Macro $macro can only be used on methods, but was found on $element');
       }
       var methodBuffer = StringBuffer();
-      macro.define(_ImplementableTargetMethodDefinition(element, methodBuffer));
+      macro.forMethodDefinition(
+          _ImplementableTargetMethodDefinition(element, methodBuffer));
       if (methodBuffer.isNotEmpty) {
         var node = (await resolver.astNodeFor(element, resolve: true))
             as ast.MethodDeclaration;
