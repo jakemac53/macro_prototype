@@ -11,37 +11,37 @@ abstract class DeclarationMacro implements Macro {}
 abstract class DefinitionMacro implements Macro {}
 
 abstract class ClassTypeMacro implements TypeMacro {
-  void type(TargetClassType type);
+  void forClassType(TargetClassType type);
 }
 
 abstract class ClassDeclarationMacro implements DeclarationMacro {
-  void declare(TargetClassDeclaration declaration);
+  void forClassDeclaration(TargetClassDeclaration declaration);
 }
 
 abstract class ClassDefinitionMacro implements DefinitionMacro {
-  void define(TargetClassDefinition definition);
+  void forClassDefinition(TargetClassDefinition definition);
 }
 
 abstract class FieldTypeMacro implements TypeMacro {
-  void type(TargetFieldType type);
+  void forFieldType(TargetFieldType type);
 }
 
 abstract class FieldDeclarationMacro implements DeclarationMacro {
-  void declare(TargetFieldDeclaration declaration);
+  void forFieldDeclaration(TargetFieldDeclaration declaration);
 }
 
 abstract class FieldDefinitionMacro implements DefinitionMacro {
-  void define(TargetFieldDefinition definition);
+  void forFieldDefinition(TargetFieldDefinition definition);
 }
 
 abstract class MethodTypeMacro implements TypeMacro {
-  void type(TargetMethodType type);
+  void forMethodType(TargetMethodType type);
 }
 
 abstract class MethodDeclarationMacro implements DeclarationMacro {
-  void declare(TargetMethodDeclaration declaration);
+  void forMethodDeclaration(TargetMethodDeclaration declaration);
 }
 
 abstract class MethodDefinitionMacro implements DefinitionMacro {
-  void define(TargetMethodDefinition definition);
+  void forMethodDefinition(TargetMethodDefinition definition);
 }
