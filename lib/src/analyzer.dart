@@ -71,6 +71,7 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
     var e = element;
     if (e is ClassElement) {
       for (var constructor in e.constructors) {
+        if (constructor.isSynthetic) continue;
         yield AnalyzerConstructorDefinition(constructor);
       }
     }
@@ -81,6 +82,7 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
     var e = element;
     if (e is ClassElement) {
       for (var field in e.fields) {
+        if (field.isSynthetic) continue;
         yield AnalyzerFieldDefinition(field);
       }
     }
@@ -94,6 +96,7 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
     var e = element;
     if (e is ClassElement) {
       for (var method in e.methods) {
+        if (method.isSynthetic) continue;
         yield AnalyzerMethodDefinition(method);
       }
     }

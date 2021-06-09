@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:mirrors';
 
-import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/ast.dart' as ast;
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
@@ -74,18 +74,19 @@ abstract class _MacroBuilder extends Builder {
     // implemented by a class macro.
     List<String>? implementedDecls,
   }) async {
+    if (element.isSynthetic) return;
     if (element is ClassElement) {
       var classBuffer = StringBuffer();
       var clazz = (await resolver.astNodeFor(element, resolve: true))
-          as ClassDeclaration;
+          as ast.ClassDeclaration;
       var start = clazz.offset;
       var end = clazz.leftBracket.charOffset;
       classBuffer.writeln(originalSource.substring(start, end + 1));
 
       implementedDecls = [];
       for (var checker in macros.keys) {
-        implementedDecls.addAll(maybeApplyMacro(checker, macros[checker]!,
-                element, classBuffer, libraryBuffer) ??
+        implementedDecls.addAll(await maybeApplyMacro(checker, macros[checker]!,
+                element, resolver, classBuffer, libraryBuffer) ??
             const []);
       }
       for (var field in element.fields) {
@@ -103,29 +104,28 @@ abstract class _MacroBuilder extends Builder {
             constructor, classBuffer, libraryBuffer, resolver, originalSource,
             implementedDecls: implementedDecls);
       }
+      for (var accessor in element.accessors) {
+        await _applyMacros(
+            accessor, classBuffer, libraryBuffer, resolver, originalSource,
+            implementedDecls: implementedDecls);
+      }
       classBuffer.writeln('}');
       buffer.writeln(classBuffer);
     } else {
       var memberBuffer = StringBuffer();
       for (var checker in macros.keys) {
-        maybeApplyMacro(
-            checker, macros[checker]!, element, memberBuffer, libraryBuffer);
+        await maybeApplyMacro(checker, macros[checker]!, element, resolver,
+            memberBuffer, libraryBuffer);
       }
-      if (memberBuffer.isEmpty) {
-        if (implementedDecls?.contains(element.name!) != true) {
-          var node = (await resolver.astNodeFor(element, resolve: true))!;
-          if (element is FieldElement) {
-            node = node.parent!.parent!;
-          }
-          buffer.writeln(node.toSource());
-        }
-      } else {
+
+      if (implementedDecls?.contains(element.name!) != true) {
         var node = (await resolver.astNodeFor(element, resolve: true))!;
-        if (node is AnnotatedNode) {
-          for (var meta in node.metadata) {
-            buffer.writeln(meta.toSource());
-          }
+        if (element is FieldElement) {
+          node = node.parent!.parent!;
         }
+        buffer.writeln(node.toSource());
+      }
+      if (memberBuffer.isNotEmpty) {
         buffer.writeln(memberBuffer);
       }
     }
@@ -133,8 +133,13 @@ abstract class _MacroBuilder extends Builder {
 
   // When applied to classes, returns the list names of the modified
   // declarations during execution of this macro
-  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
-      Element element, StringBuffer buffer, StringBuffer libraryBuffer);
+  Future<List<String>?> maybeApplyMacro(
+      TypeChecker checker,
+      Macro macro,
+      Element element,
+      Resolver resolver,
+      StringBuffer buffer,
+      StringBuffer libraryBuffer);
 }
 
 class TypesMacroBuilder extends _MacroBuilder {
@@ -142,8 +147,13 @@ class TypesMacroBuilder extends _MacroBuilder {
       : super(macros, '.gen.dart', '.types.dart');
 
   @override
-  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
-      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+  Future<List<String>?> maybeApplyMacro(
+      TypeChecker checker,
+      Macro macro,
+      Element element,
+      Resolver resolver,
+      StringBuffer buffer,
+      StringBuffer libraryBuffer) async {
     if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassTypeMacro) {
       if (element is! ClassElement) {
@@ -160,8 +170,13 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       : super(macros, '.types.dart', '.declarations.dart');
 
   @override
-  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
-      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+  Future<List<String>?> maybeApplyMacro(
+      TypeChecker checker,
+      Macro macro,
+      Element element,
+      Resolver resolver,
+      StringBuffer buffer,
+      StringBuffer libraryBuffer) async {
     if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassDeclarationMacro) {
       if (element is! ClassElement) {
@@ -193,8 +208,13 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       : super(macros, '.declarations.dart', '.dart');
 
   @override
-  List<String>? maybeApplyMacro(TypeChecker checker, Macro macro,
-      Element element, StringBuffer buffer, StringBuffer libraryBuffer) {
+  Future<List<String>?> maybeApplyMacro(
+      TypeChecker checker,
+      Macro macro,
+      Element element,
+      Resolver resolver,
+      StringBuffer buffer,
+      StringBuffer libraryBuffer) async {
     if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassDefinitionMacro) {
       if (element is! ClassElement) {
@@ -209,13 +229,32 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         throw ArgumentError(
             'Macro $macro can only be used on fields, but was found on $element');
       }
+      var fieldBuffer = StringBuffer();
       macro.define(_ImplementableTargetFieldDefinition(element, buffer));
+      if (fieldBuffer.isNotEmpty) {
+        var node = (await resolver.astNodeFor(element, resolve: true))!
+            .parent!
+            .parent as ast.FieldDeclaration;
+        for (var meta in node.metadata) {
+          buffer.writeln(meta.toSource());
+        }
+        buffer.writeln(fieldBuffer);
+      }
     } else if (macro is MethodDefinitionMacro) {
       if (element is! MethodElement) {
         throw ArgumentError(
             'Macro $macro can only be used on methods, but was found on $element');
       }
-      macro.define(_ImplementableTargetMethodDefinition(element, buffer));
+      var methodBuffer = StringBuffer();
+      macro.define(_ImplementableTargetMethodDefinition(element, methodBuffer));
+      if (methodBuffer.isNotEmpty) {
+        var node = (await resolver.astNodeFor(element, resolve: true))
+            as ast.MethodDeclaration;
+        for (var meta in node.metadata) {
+          buffer.writeln(meta.toSource());
+        }
+        buffer.writeln(methodBuffer);
+      }
     }
   }
 }
@@ -297,6 +336,7 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
   Iterable<TargetMethodDefinition> get constructors sync* {
     var e = element as ClassElement;
     for (var constructor in e.constructors) {
+      if (constructor.isSynthetic) continue;
       yield _ImplementableTargetConstructorDefinition(
           constructor, _buffer, this);
     }
@@ -306,6 +346,7 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
   Iterable<TargetFieldDefinition> get fields sync* {
     var e = element as ClassElement;
     for (var field in e.fields) {
+      if (field.isSynthetic) continue;
       yield _ImplementableTargetFieldDefinition(field, _buffer,
           parentClass: this);
     }
@@ -315,6 +356,7 @@ class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
   Iterable<TargetMethodDefinition> get methods sync* {
     var e = element as ClassElement;
     for (var method in e.methods) {
+      if (method.isSynthetic) continue;
       yield _ImplementableTargetMethodDefinition(method, _buffer,
           parentClass: this);
     }
