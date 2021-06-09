@@ -5,14 +5,14 @@ const jsonSerializable = _JsonMacro();
 class _JsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
   const _JsonMacro();
 
-  void declare(TargetClassDeclaration declaration) {
+  void forClassDeclaration(TargetClassDeclaration declaration) {
     declaration
       ..addToClass(Code('external Map<String, Object?> toJson();'))
       ..addToClass(Code(
           'external ${declaration.name}.fromJson(Map<String, Object?> json);'));
   }
 
-  void define(TargetClassDefinition definition) {
+  void forClassDefinition(TargetClassDefinition definition) {
     _defineFromJson(definition);
     _defineToJson(definition);
   }

@@ -19,6 +19,11 @@ void main() {
   var manager2 = Manager.fromJson(manager.toJson());
   assert(jsonEncode(manager2.toJson()) == jsonEncode(manager.toJson()));
 
-  var observable = new ObservableThing('hello');
+  var observable = WithObservableField('hello');
   observable.description = 'world';
+
+  var observableClass = ObservableClass('jake', 'is pretty cool');
+  observableClass
+    ..name = 'john'
+    ..description = 'is also cool';
 }

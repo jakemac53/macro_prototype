@@ -2,26 +2,32 @@ import 'package:macro_builder/macro_builder.dart';
 
 const observable = ObservableMacro();
 
-class ObservableMacro implements FieldDeclarationMacro {
+class ObservableMacro implements FieldDeclarationMacro, ClassDeclarationMacro {
   const ObservableMacro();
 
-  void declare(TargetFieldDeclaration definition) {
-    if (!definition.name.startsWith('_')) {
+  void forClassDeclaration(TargetClassDeclaration declaration) {
+    for (var field in declaration.fields) {
+      forFieldDeclaration(field);
+    }
+  }
+
+  void forFieldDeclaration(TargetFieldDeclaration declaration) {
+    if (!declaration.name.startsWith('_')) {
       throw ArgumentError(
           '@observable can only annotate private fields, and it will create '
           'public getters and setters for them, but the public field '
-          '${definition.name} was annotated.');
+          '${declaration.name} was annotated.');
     }
-    var publicName = definition.name.substring(1);
-    var getter = Code('${definition.type.toCode()} get $publicName => '
-        '${definition.name};');
-    definition.addToClass(getter);
+    var publicName = declaration.name.substring(1);
+    var getter = Code('${declaration.type.toCode()} get $publicName => '
+        '${declaration.name};');
+    declaration.addToClass(getter);
 
     var setter = Code('''
-void set $publicName(${definition.type.toCode()} val) {
+void set $publicName(${declaration.type.toCode()} val) {
   print('Setting $publicName to \${val}');
-  ${definition.name} = val;
+  ${declaration.name} = val;
 }''');
-    definition.addToClass(setter);
+    declaration.addToClass(setter);
   }
 }
