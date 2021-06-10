@@ -1,5 +1,7 @@
+import 'macros/data_class.dart';
 import 'macros/json.dart';
 
+@dataClass
 @jsonSerializable
 class User {
   User.fromJson(
@@ -9,9 +11,10 @@ class User {
         "name": name,
       };
   String name;
-  User(this.name);
+  User({this.name});
 }
 
+@dataClass
 @jsonSerializable
 class Group {
   Group.fromJson(
@@ -27,7 +30,7 @@ class Group {
       };
   final String name;
   final List<User> users;
-  Group(this.name, this.users);
+  Group({this.name, this.users});
 }
 
 @jsonSerializable
@@ -44,5 +47,4 @@ class Manager extends User {
         "name": name,
       };
   final List<User> reports;
-  Manager(String name, this.reports) : super(name);
 }

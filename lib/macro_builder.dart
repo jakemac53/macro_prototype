@@ -57,9 +57,13 @@ abstract class _MacroBuilder extends Builder {
         buildStep.inputId.package,
         inputPath.replaceRange(inputPath.length - _inputExtension.length,
             inputPath.length, _outputExtension));
-    var formatted =
-        DartFormatter().format(buffer.toString(), uri: outputId.uri);
-    await buildStep.writeAsString(outputId, formatted);
+    try {
+      var formatted =
+          DartFormatter().format(buffer.toString(), uri: outputId.uri);
+      await buildStep.writeAsString(outputId, formatted);
+    } catch (e, s) {
+      log.severe('Failed to format file $buffer', e, s);
+    }
   }
 
   Future<void> _applyMacros(
@@ -293,6 +297,7 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
   @override
   Iterable<TargetMethodDeclaration> get constructors sync* {
     for (var constructor in element.constructors) {
+      if (constructor.isSynthetic) continue;
       yield _ImplementableTargetConstructorDeclaration(
           constructor, _classBuffer);
     }
@@ -301,6 +306,7 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
   @override
   Iterable<TargetFieldDeclaration> get fields sync* {
     for (var field in element.fields) {
+      if (field.isSynthetic) continue;
       yield _ImplementableTargetFieldDeclaration(field, _classBuffer);
     }
   }
@@ -308,6 +314,7 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
   @override
   Iterable<TargetMethodDeclaration> get methods sync* {
     for (var method in element.methods) {
+      if (method.isSynthetic) continue;
       yield _ImplementableTargetMethodDeclaration(method, _classBuffer);
     }
   }
