@@ -96,6 +96,46 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
   }
 }
 
+class AnalyzerTargetTypeDeclaration extends AnalyzerTypeDeclaration
+    implements TargetTypeDeclaration {
+  AnalyzerTargetTypeDeclaration(TypeDefiningElement element,
+      {DartType? originalReference})
+      : super(element, originalReference: originalReference);
+
+  @override
+  Iterable<MethodDeclaration> get constructors sync* {
+    var e = element;
+    if (e is ClassElement) {
+      for (var constructor in e.constructors) {
+        if (constructor.isSynthetic) continue;
+        yield AnalyzerConstructorDeclaration(constructor);
+      }
+    }
+  }
+
+  @override
+  Iterable<FieldDeclaration> get fields sync* {
+    var e = element;
+    if (e is ClassElement) {
+      for (var field in e.fields) {
+        if (field.isSynthetic) continue;
+        yield AnalyzerFieldDeclaration(field);
+      }
+    }
+  }
+
+  @override
+  Iterable<MethodDeclaration> get methods sync* {
+    var e = element;
+    if (e is ClassElement) {
+      for (var method in e.methods) {
+        if (method.isSynthetic) continue;
+        yield AnalyzerMethodDeclaration(method);
+      }
+    }
+  }
+}
+
 class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
     implements TypeDefinition {
   AnalyzerTypeDefinition(TypeDefiningElement element,

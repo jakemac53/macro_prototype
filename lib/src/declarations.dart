@@ -28,6 +28,8 @@ abstract class TargetClassDeclaration implements TargetTypeDeclaration {
 
   Iterable<TargetMethodDeclaration> get methods;
 
+  TargetTypeDeclaration? get superclass;
+
   void addToClass(Code declaration);
 
   void addToLibrary(Code declaration);

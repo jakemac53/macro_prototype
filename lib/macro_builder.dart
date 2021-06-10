@@ -282,6 +282,8 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
   final StringBuffer _classBuffer;
   final StringBuffer _libraryBuffer;
 
+  ClassElement get element => super.element as ClassElement;
+
   _ImplementableTargetClassDeclaration(ClassElement element,
       {required StringBuffer classBuffer, required StringBuffer libraryBuffer})
       : _classBuffer = classBuffer,
@@ -290,8 +292,7 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
 
   @override
   Iterable<TargetMethodDeclaration> get constructors sync* {
-    var e = element as ClassElement;
-    for (var constructor in e.constructors) {
+    for (var constructor in element.constructors) {
       yield _ImplementableTargetConstructorDeclaration(
           constructor, _classBuffer);
     }
@@ -299,18 +300,24 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
 
   @override
   Iterable<TargetFieldDeclaration> get fields sync* {
-    var e = element as ClassElement;
-    for (var field in e.fields) {
+    for (var field in element.fields) {
       yield _ImplementableTargetFieldDeclaration(field, _classBuffer);
     }
   }
 
   @override
   Iterable<TargetMethodDeclaration> get methods sync* {
-    var e = element as ClassElement;
-    for (var method in e.methods) {
+    for (var method in element.methods) {
       yield _ImplementableTargetMethodDeclaration(method, _classBuffer);
     }
+  }
+
+  @override
+  TargetTypeDeclaration? get superclass {
+    if (element.isDartCoreObject) return null;
+    var superType = element.supertype!;
+    return AnalyzerTargetTypeDeclaration(superType.element,
+        originalReference: superType);
   }
 
   @override
