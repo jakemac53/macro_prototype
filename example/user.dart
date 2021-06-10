@@ -11,7 +11,7 @@ class User {
         "name": name,
       };
   String name;
-  User({this.name});
+  User({required this.name});
 }
 
 @dataClass
@@ -30,7 +30,7 @@ class Group {
       };
   final String name;
   final List<User> users;
-  Group({this.name, this.users});
+  Group({required this.name, required this.users});
 }
 
 @jsonSerializable
@@ -47,4 +47,5 @@ class Manager extends User {
         "name": name,
       };
   final List<User> reports;
+  Manager({required String name, required this.reports}) : super(name: name);
 }

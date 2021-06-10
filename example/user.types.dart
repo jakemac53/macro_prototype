@@ -17,4 +17,5 @@ class Group {
 @jsonSerializable
 class Manager extends User {
   final List<User> reports;
+  Manager({required String name, required this.reports}) : super(name: name);
 }

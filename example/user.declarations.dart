@@ -30,4 +30,5 @@ class Manager extends User {
   external Map<String, Object?> toJson();
   external Manager.fromJson(Map<String, Object?> json);
   final List<User> reports;
+  Manager({required String name, required this.reports}) : super(name: name);
 }
