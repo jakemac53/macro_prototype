@@ -17,12 +17,12 @@ abstract class TypeDefinition implements TypeDeclaration {
   Iterable<TypeParameterDefinition> get typeParameters;
 }
 
-abstract class TargetClassDefinition implements TypeDefinition {
-  Iterable<TargetMethodDefinition> get constructors;
+abstract class ClassDefinition implements TypeDefinition {
+  Iterable<MethodDefinition> get constructors;
 
-  Iterable<TargetMethodDefinition> get methods;
+  Iterable<MethodDefinition> get methods;
 
-  Iterable<TargetFieldDefinition> get fields;
+  Iterable<FieldDefinition> get fields;
 }
 
 abstract class MethodDefinition implements MethodDeclaration {
@@ -37,17 +37,21 @@ abstract class MethodDefinition implements MethodDeclaration {
   Iterable<TypeParameterDefinition> get typeParameters;
 }
 
-abstract class TargetMethodDefinition implements MethodDefinition {
-  void implement(Code body, {List<Code>? supportingDeclarations});
-}
-
 abstract class FieldDefinition implements FieldDeclaration {
   String get name;
 
   TypeDefinition get type;
 }
 
-abstract class TargetFieldDefinition implements FieldDefinition {
+abstract class ParameterDefinition implements ParameterDeclaration {
+  TypeDefinition get type;
+}
+
+abstract class TypeParameterDefinition implements TypeParameterDeclaration {
+  TypeDefinition? get bounds;
+}
+
+abstract class FieldDefinitionBuilder {
   /// Implement this as a normal field and supply an initializer.
   void withInitializer(Code body, {List<Code>? supportingDeclarations});
 
@@ -57,10 +61,6 @@ abstract class TargetFieldDefinition implements FieldDefinition {
       {List<Code>? supportingDeclarations});
 }
 
-abstract class ParameterDefinition implements ParameterDeclaration {
-  TypeDefinition get type;
-}
-
-abstract class TypeParameterDefinition implements TypeParameterDeclaration {
-  TypeDefinition? get bounds;
+abstract class MethodDefinitionBuilder {
+  void implement(Code body, {List<Code>? supportingDeclarations});
 }

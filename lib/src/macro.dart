@@ -4,44 +4,43 @@ import 'types.dart';
 
 abstract class Macro {}
 
-abstract class TypeMacro implements Macro {}
-
-abstract class DeclarationMacro implements Macro {}
-
-abstract class DefinitionMacro implements Macro {}
-
 abstract class ClassTypeMacro implements TypeMacro {
-  void type(TargetClassType type);
+  void type(ClassType type, TypeBuilder builder);
 }
 
 abstract class ClassDeclarationMacro implements DeclarationMacro {
-  void declare(TargetClassDeclaration declaration);
+  void declare(ClassDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
-abstract class ClassDefinitionMacro implements DefinitionMacro {
-  void define(TargetClassDefinition definition);
-}
+// This isn't needed. Instead, a class-level macro that adds members
+// must implement FieldDefinitionMacro and/or MethodDefinitionMacro and then
+// has those invoked directly for the members it has declared.
+//
+// A macro that declares a member is committing itself to defining it later.
+// abstract class ClassDefinitionMacro implements DefinitionMacro {
+//   void define(TargetClassDefinition definition);
+// }
 
 abstract class FieldTypeMacro implements TypeMacro {
-  void type(TargetFieldType type);
+  void type(FieldType type, TypeBuilder builder);
 }
 
 abstract class FieldDeclarationMacro implements DeclarationMacro {
-  void declare(TargetFieldDeclaration declaration);
+  void declare(FieldDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
 abstract class FieldDefinitionMacro implements DefinitionMacro {
-  void define(TargetFieldDefinition definition);
+  void define(FieldDefinition definition, FieldDefinitionBuilder builder);
 }
 
 abstract class MethodTypeMacro implements TypeMacro {
-  void type(TargetMethodType type);
+  void type(MethodType type, TypeBuilder builder);
 }
 
 abstract class MethodDeclarationMacro implements DeclarationMacro {
-  void declare(TargetMethodDeclaration declaration);
+  void declare(MethodDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
 abstract class MethodDefinitionMacro implements DefinitionMacro {
-  void define(TargetMethodDefinition definition);
+  void define(MethodDefinition definition MethodDefinitionBuilder builder);
 }

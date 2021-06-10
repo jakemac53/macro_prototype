@@ -19,8 +19,8 @@ abstract class DeclarationType {
   String get name;
 }
 
-abstract class TargetClassType implements TypeReference, DeclarationType {
-  void addTypeToLibary(Code declaration);
+abstract class ClassType implements TypeReference, DeclarationType {
+  // TODO: Get TypeReferences for superclass and superinterfaces?
 }
 
 abstract class MethodType implements DeclarationType {
@@ -37,16 +37,8 @@ abstract class MethodType implements DeclarationType {
   Iterable<TypeParameterType> get typeParameters;
 }
 
-abstract class TargetMethodType implements MethodType {
-  void addTypeToLibary(Code declaration);
-}
-
 abstract class FieldType implements DeclarationType {
   TypeReference get type;
-}
-
-abstract class TargetFieldType implements FieldType {
-  void addTypeToLibary(Code declaration);
 }
 
 abstract class ParameterType {
@@ -61,4 +53,8 @@ abstract class TypeParameterType {
   TypeReference? get bounds;
 
   String get name;
+}
+
+abstract class TypeBuilder {
+  void addTypeToLibary(Code declaration);
 }
