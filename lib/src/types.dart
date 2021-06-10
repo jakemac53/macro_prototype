@@ -11,12 +11,22 @@ abstract class TypeReference {
   Code get reference;
 }
 
-abstract class TargetClassType implements TypeReference {
+abstract class DeclarationType {
+  bool get isAbstract;
+
+  bool get isExternal;
+
+  String get name;
+}
+
+abstract class TargetClassType implements TypeReference, DeclarationType {
   void addTypeToLibary(Code declaration);
 }
 
-abstract class MethodType {
-  String get name;
+abstract class MethodType implements DeclarationType {
+  bool get isGetter;
+
+  bool get isSetter;
 
   TypeReference get returnType;
 
@@ -31,9 +41,7 @@ abstract class TargetMethodType implements MethodType {
   void addTypeToLibary(Code declaration);
 }
 
-abstract class FieldType {
-  String get name;
-
+abstract class FieldType implements DeclarationType {
   TypeReference get type;
 }
 
@@ -42,12 +50,15 @@ abstract class TargetFieldType implements FieldType {
 }
 
 abstract class ParameterType {
-  TypeReference get type;
   String get name;
+
+  TypeReference get type;
+
   bool get required;
 }
 
 abstract class TypeParameterType {
-  String get name;
   TypeReference? get bounds;
+
+  String get name;
 }

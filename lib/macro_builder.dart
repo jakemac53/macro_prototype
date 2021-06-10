@@ -266,12 +266,12 @@ class _ImplementableTargetClassType extends AnalyzerTypeReference
   _ImplementableTargetClassType(ClassElement element, this._libraryBuffer)
       : super(element);
 
-  Iterable<TypeReference> get superinterfaces sync* {
-    for (var interface in element.allSupertypes) {
-      yield AnalyzerTypeReference(interface.element,
-          originalReference: interface);
-    }
-  }
+  @override
+  bool get isAbstract => element.isAbstract;
+
+  @override
+  bool get isExternal => throw UnsupportedError(
+      'Analyzer doesn\'t have an isExternal getter for classes.');
 
   @override
   void addTypeToLibary(Code declaration) => _libraryBuffer.writeln(declaration);

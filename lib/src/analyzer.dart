@@ -38,6 +38,21 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
   bool isSubtype(TypeDeclaration other) => throw UnimplementedError();
 
   @override
+  bool get isAbstract {
+    var e = element;
+    if (e is! ClassElement) return false;
+    return e.isAbstract;
+  }
+
+  @override
+  bool get isExternal {
+    var e = element;
+    if (e is! ClassElement) return false;
+    throw UnsupportedError(
+        'Analyzer doesn\'t appear to have an isExternal getter for classes?');
+  }
+
+  @override
   TypeDeclaration? get superclass {
     var e = element;
     if (e is ClassElement && !e.isDartCoreObject) {
@@ -168,9 +183,27 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
 }
 
 class AnalyzerMethodDeclaration implements MethodDeclaration {
-  final MethodElement element;
+  final ExecutableElement element;
 
   AnalyzerMethodDeclaration(this.element);
+
+  @override
+  bool get isAbstract => element.isAbstract;
+
+  @override
+  bool get isExternal => element.isExternal;
+
+  @override
+  bool get isGetter {
+    var e = element;
+    return e is PropertyAccessorElement && e.isGetter;
+  }
+
+  @override
+  bool get isSetter {
+    var e = element;
+    return e is PropertyAccessorElement && e.isSetter;
+  }
 
   @override
   String get name => element.name;
@@ -204,7 +237,7 @@ class AnalyzerMethodDeclaration implements MethodDeclaration {
 
 class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
     implements MethodDefinition {
-  AnalyzerMethodDefinition(MethodElement element) : super(element);
+  AnalyzerMethodDefinition(ExecutableElement element) : super(element);
 
   @override
   Map<String, ParameterDefinition> get namedParameters => {
@@ -237,6 +270,18 @@ class AnalyzerConstructorDeclaration implements MethodDeclaration {
   final ConstructorElement element;
 
   AnalyzerConstructorDeclaration(this.element);
+
+  @override
+  bool get isAbstract => element.isAbstract;
+
+  @override
+  bool get isExternal => element.isExternal;
+
+  @override
+  bool get isGetter => false;
+
+  @override
+  bool get isSetter => false;
 
   @override
   String get name => element.name;
@@ -303,6 +348,12 @@ class AnalyzerFieldDeclaration implements FieldDeclaration {
   final FieldElement element;
 
   AnalyzerFieldDeclaration(this.element);
+
+  @override
+  bool get isAbstract => element.isAbstract;
+
+  @override
+  bool get isExternal => element.isExternal;
 
   @override
   String get name => element.name;

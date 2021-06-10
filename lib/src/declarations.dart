@@ -1,7 +1,7 @@
 import 'code.dart';
 import 'types.dart';
 
-abstract class TypeDeclaration implements TypeReference {
+abstract class TypeDeclaration implements TypeReference, DeclarationType {
   TypeDeclaration? get superclass;
 
   Iterable<TypeDeclaration> get superinterfaces;
@@ -13,7 +13,15 @@ abstract class TypeDeclaration implements TypeReference {
   bool isSubtype(TypeDeclaration other);
 }
 
-abstract class TargetClassDeclaration implements TypeDeclaration {
+abstract class TargetTypeDeclaration extends TypeDeclaration {
+  Iterable<MethodDeclaration> get constructors;
+
+  Iterable<FieldDeclaration> get fields;
+
+  Iterable<MethodDeclaration> get methods;
+}
+
+abstract class TargetClassDeclaration implements TargetTypeDeclaration {
   Iterable<TargetMethodDeclaration> get constructors;
 
   Iterable<TargetFieldDeclaration> get fields;
