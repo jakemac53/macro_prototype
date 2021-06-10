@@ -38,6 +38,27 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
   bool isSubtype(TypeDeclaration other) => throw UnimplementedError();
 
   @override
+  TypeDeclaration? get superclass {
+    var e = element;
+    if (e is ClassElement && !e.isDartCoreObject) {
+      var superType = e.supertype!;
+      return AnalyzerTypeDeclaration(superType.element,
+          originalReference: superType);
+    }
+  }
+
+  @override
+  Iterable<TypeDeclaration> get superinterfaces sync* {
+    var e = element;
+    if (e is ClassElement) {
+      for (var interface in e.allSupertypes) {
+        yield AnalyzerTypeDeclaration(interface.element,
+            originalReference: interface);
+      }
+    }
+  }
+
+  @override
   Iterable<TypeDeclaration> get typeArguments sync* {
     var reference = originalReference;
     if (reference is ParameterizedType) {

@@ -2,6 +2,10 @@ import 'code.dart';
 import 'types.dart';
 
 abstract class TypeDeclaration implements TypeReference {
+  TypeDeclaration? get superclass;
+
+  Iterable<TypeDeclaration> get superinterfaces;
+
   Iterable<TypeDeclaration> get typeArguments;
 
   Iterable<TypeParameterDeclaration> get typeParameters;
