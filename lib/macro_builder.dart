@@ -34,7 +34,7 @@ abstract class _MacroBuilder extends Builder {
       Iterable<Macro> macros, this._inputExtension, this._outputExtension)
       : macros = {
           for (var macro in macros)
-            TypeChecker.fromUrl(_assetUrlFor(macro)): macro,
+            TypeChecker.fromRuntime(macro.runtimeType): macro,
         };
 
   @override
@@ -501,11 +501,4 @@ extension ToCode on TypeDeclaration {
     if (isNullable) type.write('?');
     return type.toString();
   }
-}
-
-String _assetUrlFor(Macro macro) {
-  var mirror = reflectClass(macro.runtimeType);
-  var uri = (mirror.owner as LibraryMirror).uri;
-  var relative = p.relative(uri.path);
-  return 'asset:macro_builder/$relative#${MirrorSystem.getName(mirror.simpleName)}';
 }
