@@ -2,10 +2,6 @@ import 'code.dart';
 import 'types.dart';
 
 abstract class TypeDeclaration implements TypeReference, DeclarationType {
-  TypeDeclaration? get superclass;
-
-  Iterable<TypeDeclaration> get superinterfaces;
-
   Iterable<TypeDeclaration> get typeArguments;
 
   Iterable<TypeParameterDeclaration> get typeParameters;
@@ -13,26 +9,16 @@ abstract class TypeDeclaration implements TypeReference, DeclarationType {
   bool isSubtype(TypeDeclaration other);
 }
 
-abstract class TargetTypeDeclaration extends TypeDeclaration {
+abstract class ClassDeclaration implements TypeDeclaration, ClassType {
   Iterable<MethodDeclaration> get constructors;
 
   Iterable<FieldDeclaration> get fields;
 
   Iterable<MethodDeclaration> get methods;
-}
 
-abstract class TargetClassDeclaration implements TargetTypeDeclaration {
-  Iterable<TargetMethodDeclaration> get constructors;
+  TypeDeclaration? get superclass;
 
-  Iterable<TargetFieldDeclaration> get fields;
-
-  Iterable<TargetMethodDeclaration> get methods;
-
-  TargetTypeDeclaration? get superclass;
-
-  void addToClass(Code declaration);
-
-  void addToLibrary(Code declaration);
+  Iterable<TypeDeclaration> get superinterfaces;
 }
 
 abstract class MethodDeclaration implements MethodType {
@@ -45,18 +31,10 @@ abstract class MethodDeclaration implements MethodType {
   Iterable<TypeParameterDeclaration> get typeParameters;
 }
 
-abstract class TargetMethodDeclaration implements MethodDeclaration {
-  void addToClass(Code declaration);
-}
-
 abstract class FieldDeclaration implements FieldType {
   String get name;
 
   TypeDeclaration get type;
-}
-
-abstract class TargetFieldDeclaration implements FieldDeclaration {
-  void addToClass(Code declaration);
 }
 
 abstract class ParameterDeclaration implements ParameterType {
@@ -65,4 +43,15 @@ abstract class ParameterDeclaration implements ParameterType {
 
 abstract class TypeParameterDeclaration implements TypeParameterType {
   TypeDeclaration? get bounds;
+}
+
+abstract class DeclarationBuilder {
+  void addToLibrary(Code declaration);
+}
+
+abstract class ClassDeclarationBuilder implements DeclarationBuilder {
+  // TODO: If we want library level macros that can have a declaration phase
+  // that adds stuff to classes, then this should take a parameter to identify
+  // which class [declaration] should be added to.
+  void addToClass(Code declaration);
 }

@@ -11,37 +11,38 @@ abstract class DeclarationMacro implements Macro {}
 abstract class DefinitionMacro implements Macro {}
 
 abstract class ClassTypeMacro implements TypeMacro {
-  void type(TargetClassType type);
+  void visitClassType(ClassType type, TypeBuilder builder);
 }
 
 abstract class ClassDeclarationMacro implements DeclarationMacro {
-  void declare(TargetClassDeclaration declaration);
-}
-
-abstract class ClassDefinitionMacro implements DefinitionMacro {
-  void define(TargetClassDefinition definition);
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
 abstract class FieldTypeMacro implements TypeMacro {
-  void type(TargetFieldType type);
+  void visitFieldType(FieldType type, TypeBuilder builder);
 }
 
 abstract class FieldDeclarationMacro implements DeclarationMacro {
-  void declare(TargetFieldDeclaration declaration);
+  void visitFieldDeclaration(
+      FieldDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
 abstract class FieldDefinitionMacro implements DefinitionMacro {
-  void define(TargetFieldDefinition definition);
+  void visitFieldDefinition(
+      FieldDefinition definition, FieldDefinitionBuilder builder);
 }
 
 abstract class MethodTypeMacro implements TypeMacro {
-  void type(TargetMethodType type);
+  void visitMethodType(MethodType type, TypeBuilder builder);
 }
 
 abstract class MethodDeclarationMacro implements DeclarationMacro {
-  void declare(TargetMethodDeclaration declaration);
+  void visitMethodDeclaration(
+      MethodDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
 abstract class MethodDefinitionMacro implements DefinitionMacro {
-  void define(TargetMethodDefinition definition);
+  void visitMethodDefinition(
+      MethodDefinition definition, MethodDefinitionBuilder builder);
 }

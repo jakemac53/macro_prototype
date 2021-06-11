@@ -2,26 +2,35 @@ import 'package:macro_builder/macro_builder.dart';
 
 const jsonSerializable = _JsonMacro();
 
-class _JsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
+class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   const _JsonMacro();
 
-  void declare(TargetClassDeclaration declaration) {
-    declaration
-      ..addToClass(Code('external Map<String, Object?> toJson();'))
-      ..addToClass(Code(
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
+    builder
+      ..addToClass(
+          Code('@jsonSerializable\nexternal Map<String, Object?> toJson();'))
+      ..addToClass(Code('@jsonSerializable\n'
           'external ${declaration.name}.fromJson(Map<String, Object?> json);'));
   }
 
-  void define(TargetClassDefinition definition) {
-    _defineFromJson(definition);
-    _defineToJson(definition);
+  void visitMethodDefinition(
+      MethodDefinition definition, MethodDefinitionBuilder builder) {
+    switch (definition.name) {
+      case 'fromJson':
+        _defineFromJson(definition, builder);
+        break;
+      case 'toJson':
+        _defineToJson(definition, builder);
+        break;
+    }
   }
 
-  void _defineFromJson(TargetClassDefinition definition) {
-    var fromJson =
-        definition.constructors.firstWhere((m) => m.name == 'fromJson');
+  void _defineFromJson(
+      MethodDefinition fromJson, MethodDefinitionBuilder builder) {
     var code = Code(' : ');
-    var fields = definition.fields.toList();
+    var clazz = fromJson.definingClass!;
+    var fields = clazz.fields.toList();
     for (var field in fields) {
       code = Code(
           '$code\n ${field.name} = ${_typeFromJson(field.type, Code('json["${field.name}"]'))}'
@@ -29,7 +38,7 @@ class _JsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
     }
     // Need to call super constructors, we require they have a fromJson
     // constructor identical to one we would create, to simplify things.
-    var superclass = definition.superclass;
+    var superclass = clazz.superclass;
     if (superclass != null && superclass.name != 'Object') {
       if (!_hasFromJson(superclass)) {
         throw UnsupportedError(
@@ -39,15 +48,15 @@ class _JsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
     }
 
     code = Code('$code;');
-    fromJson.implement(code);
+    builder.implement(code);
   }
 
-  void _defineToJson(TargetClassDefinition definition) {
-    var toJsonMethod = definition.methods.firstWhere((m) => m.name == 'toJson');
+  void _defineToJson(MethodDefinition toJson, MethodDefinitionBuilder builder) {
+    var clazz = toJson.definingClass!;
     var code = Code('=> <String, Object?>{\n');
-    var allFields = <FieldDefinition>[...definition.fields];
-    var next = definition.superclass;
-    while (next != null && next.name != 'Object') {
+    var allFields = <FieldDefinition>[...clazz.fields];
+    var next = clazz.superclass;
+    while (next is ClassDefinition && next.name != 'Object') {
       allFields.addAll(next.fields);
       next = next.superclass;
     }
@@ -56,7 +65,7 @@ class _JsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
           '$code  "${field.name}": ${_typeToJson(field.type, Code(field.name))},\n');
     }
     code = Code('$code};');
-    toJsonMethod.implement(code);
+    builder.implement(code);
   }
 
   Code _typeFromJson(TypeDefinition type, Code jsonReference) {
@@ -77,14 +86,16 @@ class _JsonMacro implements ClassDeclarationMacro, ClassDefinitionMacro {
       var typeArgToJson = _typeToJson(type.typeArguments.first, Code('e'));
       return Code('[for (var e in $instanceReference) $typeArgToJson]');
     }
-    var hasCompatibleToJson = type.methods.any((element) =>
-        element.name == 'toJson' &&
-        element.returnType.name == 'Map' &&
-        element.returnType.typeArguments.first.name == 'String');
+    var hasCompatibleToJson = type is ClassDefinition &&
+        type.methods.any((element) =>
+            element.name == 'toJson' &&
+            element.returnType.name == 'Map' &&
+            element.returnType.typeArguments.first.name == 'String');
     return Code('$instanceReference${hasCompatibleToJson ? '.toJson()' : ''}');
   }
 
   bool _hasFromJson(TypeDefinition definition) =>
+      definition is ClassDefinition &&
       definition.constructors.any((constructor) =>
           constructor.name == 'fromJson' &&
           constructor.positionalParameters.length == 1 &&

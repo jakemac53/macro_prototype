@@ -1,3 +1,5 @@
+import: "package:pedantic/analysis_options.yaml"
+
 analyzer:
   strong-mode:
     implicit-casts: false
@@ -5,3 +7,4 @@ analyzer:
 linter:
   rules:
     - unawaited_futures
+    - unnecessary_overrides
