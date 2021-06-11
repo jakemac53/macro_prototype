@@ -4,7 +4,9 @@ import 'macros/json.dart';
 @dataClass
 @jsonSerializable
 class User {
+  @jsonSerializable
   external Map<String, Object?> toJson();
+  @jsonSerializable
   external User.fromJson(Map<String, Object?> json);
   User({
     required this.name,
@@ -15,7 +17,9 @@ class User {
 @dataClass
 @jsonSerializable
 class Group {
+  @jsonSerializable
   external Map<String, Object?> toJson();
+  @jsonSerializable
   external Group.fromJson(Map<String, Object?> json);
   Group({
     required this.name,
@@ -27,7 +31,9 @@ class Group {
 
 @jsonSerializable
 class Manager extends User {
+  @jsonSerializable
   external Map<String, Object?> toJson();
+  @jsonSerializable
   external Manager.fromJson(Map<String, Object?> json);
   final List<User> reports;
   Manager({required String name, required this.reports}) : super(name: name);

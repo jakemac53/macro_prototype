@@ -20,7 +20,9 @@ abstract class DeclarationType {
 }
 
 abstract class ClassType implements TypeReference, DeclarationType {
-  // TODO: Get TypeReferences for superclass and superinterfaces?
+  TypeReference? get superclass;
+
+  Iterable<TypeReference> get superinterfaces;
 }
 
 abstract class MethodType implements DeclarationType {

@@ -2,30 +2,26 @@ import 'code.dart';
 import 'declarations.dart';
 
 abstract class TypeDefinition implements TypeDeclaration {
-  Iterable<MethodDefinition> get constructors;
-
-  Iterable<FieldDefinition> get fields;
-
-  Iterable<MethodDefinition> get methods;
-
-  TypeDefinition? get superclass;
-
-  Iterable<TypeDefinition> get superinterfaces;
-
   Iterable<TypeDefinition> get typeArguments;
 
   Iterable<TypeParameterDefinition> get typeParameters;
 }
 
-abstract class ClassDefinition implements TypeDefinition {
+abstract class ClassDefinition implements TypeDefinition, ClassDeclaration {
   Iterable<MethodDefinition> get constructors;
 
   Iterable<MethodDefinition> get methods;
 
   Iterable<FieldDefinition> get fields;
+
+  TypeDefinition? get superclass;
+
+  Iterable<TypeDefinition> get superinterfaces;
 }
 
 abstract class MethodDefinition implements MethodDeclaration {
+  ClassDefinition? get definingClass;
+
   String get name;
 
   TypeDefinition get returnType;
@@ -38,6 +34,8 @@ abstract class MethodDefinition implements MethodDeclaration {
 }
 
 abstract class FieldDefinition implements FieldDeclaration {
+  ClassDefinition? get definingClass;
+
   String get name;
 
   TypeDefinition get type;

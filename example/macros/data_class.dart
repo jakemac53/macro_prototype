@@ -6,8 +6,9 @@ const dataClass = const _DataClass();
 class _DataClass implements ClassDeclarationMacro {
   const _DataClass();
 
-  void declare(TargetClassDeclaration declaration) {
-    autoConstructor.declare(declaration);
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
+    autoConstructor.visitClassDeclaration(declaration, builder);
   }
 }
 
@@ -16,7 +17,8 @@ const autoConstructor = const _AutoConstructor();
 class _AutoConstructor implements ClassDeclarationMacro {
   const _AutoConstructor();
 
-  void declare(TargetClassDeclaration declaration) {
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     if (declaration.constructors.any((c) => c.name == '')) {
       throw ArgumentError(
           'Cannot generate a constructor because one already exists');
@@ -28,7 +30,7 @@ class _AutoConstructor implements ClassDeclarationMacro {
     }
     var superclass = declaration.superclass;
     MethodDeclaration? superconstructor;
-    if (superclass != null) {
+    if (superclass is ClassDeclaration) {
       var superconstructor =
           superclass.constructors.firstWhereOrNull((c) => c.name == '');
       if (superconstructor == null) {
@@ -65,7 +67,7 @@ class _AutoConstructor implements ClassDeclarationMacro {
       code = Code('$code)');
     }
     code = Code('$code;');
-    declaration.addToClass(code);
+    builder.addToClass(code);
   }
 }
 
@@ -74,7 +76,8 @@ const copyWith = const _CopyWith();
 class _CopyWith implements ClassDeclarationMacro {
   const _CopyWith();
 
-  void declare(TargetClassDeclaration declaration) {
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     if (declaration.methods.any((c) => c.name == 'copyWith')) {
       throw ArgumentError(
           'Cannot generate a copyWith method because one already exists');

@@ -77,6 +77,7 @@ abstract class _MacroBuilder extends Builder {
     List<String>? implementedDecls,
   }) async {
     if (element.isSynthetic) return;
+    implementedDecls ??= [];
     if (element is ClassElement) {
       var classBuffer = StringBuffer();
       var clazz = (await resolver.astNodeFor(element, resolve: true))
@@ -85,7 +86,6 @@ abstract class _MacroBuilder extends Builder {
       var end = clazz.leftBracket.charOffset;
       classBuffer.writeln(originalSource.substring(start, end + 1));
 
-      implementedDecls = [];
       for (var checker in macros.keys) {
         implementedDecls.addAll(await maybeApplyMacro(checker, macros[checker]!,
                 element, resolver, classBuffer, libraryBuffer) ??
@@ -116,11 +116,12 @@ abstract class _MacroBuilder extends Builder {
     } else {
       var memberBuffer = StringBuffer();
       for (var checker in macros.keys) {
-        await maybeApplyMacro(checker, macros[checker]!, element, resolver,
-            memberBuffer, libraryBuffer);
+        implementedDecls.addAll(await maybeApplyMacro(checker, macros[checker]!,
+                element, resolver, memberBuffer, libraryBuffer) ??
+            const []);
       }
 
-      if (implementedDecls?.contains(element.name!) != true) {
+      if (implementedDecls.contains(element.name!) != true) {
         var node = (await resolver.astNodeFor(element, resolve: true))!;
         if (element is FieldElement) {
           node = node.parent!.parent!;
@@ -162,7 +163,8 @@ class TypesMacroBuilder extends _MacroBuilder {
         throw ArgumentError(
             'Macro $macro can only be used on classes, but was found on $element');
       }
-      macro.type(_ImplementableTargetClassType(element, libraryBuffer));
+      macro.visitClassType(
+          AnalyzerClassType(element), _MacroTypeBuilder(libraryBuffer));
     }
   }
 }
@@ -180,27 +182,38 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       StringBuffer buffer,
       StringBuffer libraryBuffer) async {
     if (!checker.hasAnnotationOf(element)) return null;
-    if (macro is ClassDeclarationMacro) {
-      if (element is! ClassElement) {
+    if (element is ClassElement) {
+      if (macro is! ClassDeclarationMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on classes, but was found on $element');
+            'Macro $macro does not support running on classes but was found on '
+            '$element');
       }
-      macro.declare(_ImplementableTargetClassDeclaration(element,
-          classBuffer: buffer, libraryBuffer: libraryBuffer));
+      macro.visitClassDeclaration(
+          AnalyzerClassDeclaration(element),
+          _MacroClassDeclarationBuilder(
+              classBuffer: buffer, libraryBuffer: libraryBuffer));
       // TODO: return list of names of declarations modified
     }
-    if (macro is FieldDeclarationMacro) {
-      if (element is! FieldElement) {
+    if (element is FieldElement) {
+      if (macro is! FieldDeclarationMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on fields, but was found on $element');
+            'Macro $macro does not support running on fields but was found on '
+            '$element');
       }
-      macro.declare(_ImplementableTargetFieldDeclaration(element, buffer));
-    } else if (macro is MethodDeclarationMacro) {
-      if (element is! MethodElement) {
+      macro.visitFieldDeclaration(
+          AnalyzerFieldDeclaration(element),
+          _MacroClassDeclarationBuilder(
+              classBuffer: buffer, libraryBuffer: libraryBuffer));
+    } else if (element is MethodElement || element is ConstructorElement) {
+      if (macro is! MethodDeclarationMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on methods, but was found on $element');
+            'Macro $macro does not support running on methods or constructors, '
+            'but was found on $element');
       }
-      macro.declare(_ImplementableTargetMethodDeclaration(element, buffer));
+      macro.visitMethodDeclaration(
+          AnalyzerMethodDeclaration(element as ExecutableElement),
+          _MacroClassDeclarationBuilder(
+              classBuffer: buffer, libraryBuffer: libraryBuffer));
     }
   }
 }
@@ -218,21 +231,19 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       StringBuffer buffer,
       StringBuffer libraryBuffer) async {
     if (!checker.hasAnnotationOf(element)) return null;
-    if (macro is ClassDefinitionMacro) {
-      if (element is! ClassElement) {
+    if (element is FieldElement) {
+      if (macro is! FieldDefinitionMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on classes, but was found on $element');
-      }
-      var targetClass = _ImplementableTargetClassDefinition(element, buffer);
-      macro.define(targetClass);
-      return targetClass._implementedDeclarations;
-    } else if (macro is FieldDefinitionMacro) {
-      if (element is! FieldElement) {
-        throw ArgumentError(
-            'Macro $macro can only be used on fields, but was found on $element');
+            'Macro $macro does not support running on fields but was found on '
+            '$element');
       }
       var fieldBuffer = StringBuffer();
-      macro.define(_ImplementableTargetFieldDefinition(element, buffer));
+      var definition = AnalyzerFieldDefinition(element,
+          parentClass: element.enclosingElement as ClassElement?);
+      var parent =
+          AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+      macro.visitFieldDefinition(
+          definition, _MacroFieldDefinitionBuilder(buffer, definition, parent));
       if (fieldBuffer.isNotEmpty) {
         var node = (await resolver.astNodeFor(element, resolve: true))!
             .parent!
@@ -241,91 +252,64 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
           buffer.writeln(meta.toSource());
         }
         buffer.writeln(fieldBuffer);
+        return [element.name];
       }
-    } else if (macro is MethodDefinitionMacro) {
-      if (element is! MethodElement) {
+    } else if (element is MethodElement || element is ConstructorElement) {
+      if (macro is! MethodDefinitionMacro) {
         throw ArgumentError(
-            'Macro $macro can only be used on methods, but was found on $element');
+            'Macro $macro does not support running on methods or constructors, '
+            'but was found on $element');
       }
       var methodBuffer = StringBuffer();
-      macro.define(_ImplementableTargetMethodDefinition(element, methodBuffer));
+      MethodDefinitionBuilder builder;
+      MethodDefinition definition;
+      ClassDefinition parent;
+      parent =
+          AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+      if (element is MethodElement) {
+        definition = AnalyzerMethodDefinition(element,
+            parentClass: element.enclosingElement as ClassElement?);
+        builder =
+            _MacroMethodDefinitionBuilder(methodBuffer, definition, parent);
+      } else if (element is ConstructorElement) {
+        definition = AnalyzerMethodDefinition(element,
+            parentClass: element.enclosingElement);
+        builder = _MacroConstructorDefinitionBuilder(
+            methodBuffer, definition, parent);
+      } else {
+        throw StateError('unreachable');
+      }
+      macro.visitMethodDefinition(definition, builder);
       if (methodBuffer.isNotEmpty) {
         var node = (await resolver.astNodeFor(element, resolve: true))
-            as ast.MethodDeclaration;
+            as ast.AnnotatedNode;
         for (var meta in node.metadata) {
           buffer.writeln(meta.toSource());
         }
         buffer.writeln(methodBuffer);
+        return [(element as ExecutableElement).name];
       }
     }
   }
 }
 
-class _ImplementableTargetClassType extends AnalyzerTypeReference
-    implements TargetClassType {
+class _MacroTypeBuilder implements TypeBuilder {
   final StringBuffer _libraryBuffer;
 
-  ClassElement get element => super.element as ClassElement;
-
-  _ImplementableTargetClassType(ClassElement element, this._libraryBuffer)
-      : super(element);
-
-  @override
-  bool get isAbstract => element.isAbstract;
-
-  @override
-  bool get isExternal => throw UnsupportedError(
-      'Analyzer doesn\'t have an isExternal getter for classes.');
+  _MacroTypeBuilder(this._libraryBuffer);
 
   @override
   void addTypeToLibary(Code declaration) => _libraryBuffer.writeln(declaration);
 }
 
-class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
-    implements TargetClassDeclaration {
+class _MacroClassDeclarationBuilder implements ClassDeclarationBuilder {
   final StringBuffer _classBuffer;
   final StringBuffer _libraryBuffer;
 
-  ClassElement get element => super.element as ClassElement;
-
-  _ImplementableTargetClassDeclaration(ClassElement element,
+  _MacroClassDeclarationBuilder(
       {required StringBuffer classBuffer, required StringBuffer libraryBuffer})
       : _classBuffer = classBuffer,
-        _libraryBuffer = libraryBuffer,
-        super(element);
-
-  @override
-  Iterable<TargetMethodDeclaration> get constructors sync* {
-    for (var constructor in element.constructors) {
-      if (constructor.isSynthetic) continue;
-      yield _ImplementableTargetConstructorDeclaration(
-          constructor, _classBuffer);
-    }
-  }
-
-  @override
-  Iterable<TargetFieldDeclaration> get fields sync* {
-    for (var field in element.fields) {
-      if (field.isSynthetic) continue;
-      yield _ImplementableTargetFieldDeclaration(field, _classBuffer);
-    }
-  }
-
-  @override
-  Iterable<TargetMethodDeclaration> get methods sync* {
-    for (var method in element.methods) {
-      if (method.isSynthetic) continue;
-      yield _ImplementableTargetMethodDeclaration(method, _classBuffer);
-    }
-  }
-
-  @override
-  TargetTypeDeclaration? get superclass {
-    if (element.isDartCoreObject) return null;
-    var superType = element.supertype!;
-    return AnalyzerTargetTypeDeclaration(superType.element,
-        originalReference: superType);
-  }
+        _libraryBuffer = libraryBuffer;
 
   @override
   void addToClass(Code declaration) => _classBuffer.writeln(declaration);
@@ -334,113 +318,49 @@ class _ImplementableTargetClassDeclaration extends AnalyzerTypeDeclaration
   void addToLibrary(Code declaration) => _libraryBuffer.writeln(declaration);
 }
 
-class _ImplementableTargetClassDefinition extends AnalyzerTypeDefinition
-    implements TargetClassDefinition {
+class _MacroFieldDefinitionBuilder implements FieldDefinitionBuilder {
   final StringBuffer _buffer;
+  final FieldDefinition _definition;
+  final ClassDefinition definingClass;
 
-  // Names of declarations implemented during execution of this macro.
-  final _implementedDeclarations = <String>[];
-
-  _ImplementableTargetClassDefinition(ClassElement element, this._buffer)
-      : super(element);
-
-  @override
-  Iterable<TargetMethodDefinition> get constructors sync* {
-    var e = element as ClassElement;
-    for (var constructor in e.constructors) {
-      if (constructor.isSynthetic) continue;
-      yield _ImplementableTargetConstructorDefinition(
-          constructor, _buffer, this);
-    }
-  }
-
-  @override
-  Iterable<TargetFieldDefinition> get fields sync* {
-    var e = element as ClassElement;
-    for (var field in e.fields) {
-      if (field.isSynthetic) continue;
-      yield _ImplementableTargetFieldDefinition(field, _buffer,
-          parentClass: this);
-    }
-  }
-
-  @override
-  Iterable<TargetMethodDefinition> get methods sync* {
-    var e = element as ClassElement;
-    for (var method in e.methods) {
-      if (method.isSynthetic) continue;
-      yield _ImplementableTargetMethodDefinition(method, _buffer,
-          parentClass: this);
-    }
-  }
-}
-
-class _ImplementableTargetFieldDeclaration extends AnalyzerFieldDeclaration
-    implements TargetFieldDeclaration {
-  final StringBuffer _classBuffer;
-  _ImplementableTargetFieldDeclaration(FieldElement element, this._classBuffer)
-      : super(element);
-
-  @override
-  void addToClass(Code declaration) => _classBuffer.writeln(declaration);
-}
-
-class _ImplementableTargetFieldDefinition extends AnalyzerFieldDefinition
-    implements TargetFieldDefinition {
-  final StringBuffer _buffer;
-  final _ImplementableTargetClassDefinition? parentClass;
-
-  _ImplementableTargetFieldDefinition(FieldElement element, this._buffer,
-      {this.parentClass})
-      : super(element);
+  _MacroFieldDefinitionBuilder(
+      this._buffer, this._definition, this.definingClass);
 
   @override
   void withInitializer(Code body, {List<Code>? supportingDeclarations}) {
-    parentClass?._implementedDeclarations.add(name);
     _buffer.writeln('''
-${type.toCode()} ${name} = $body;''');
+${_definition.type.toCode()} ${_definition.name} = $body;''');
     supportingDeclarations?.forEach(_buffer.writeln);
   }
 
   @override
   void withGetterSetterPair(Code getter, Code setter,
       {List<Code>? supportingDeclarations}) {
-    parentClass?._implementedDeclarations.add(name);
+    if (!_definition.isAbstract && !_definition.isExternal) {
+      throw 'Cannot implement non-abstract or external field $_definition';
+    }
     _buffer..writeln(getter)..writeln(setter);
     supportingDeclarations?.forEach(_buffer.writeln);
   }
 }
 
-class _ImplementableTargetMethodDeclaration extends AnalyzerMethodDeclaration
-    implements TargetMethodDeclaration {
+class _MacroMethodDefinitionBuilder implements MethodDefinitionBuilder {
   final StringBuffer _buffer;
+  final MethodDefinition _definition;
+  final ClassDefinition definingClass;
 
-  _ImplementableTargetMethodDeclaration(MethodElement element, this._buffer)
-      : super(element);
-
-  @override
-  void addToClass(Code declaration) => _buffer.writeln(declaration);
-}
-
-class _ImplementableTargetMethodDefinition extends AnalyzerMethodDefinition
-    implements TargetMethodDefinition {
-  final StringBuffer _buffer;
-  final _ImplementableTargetClassDefinition? parentClass;
-
-  _ImplementableTargetMethodDefinition(MethodElement element, this._buffer,
-      {this.parentClass})
-      : super(element);
+  _MacroMethodDefinitionBuilder(
+      this._buffer, this._definition, this.definingClass);
 
   @override
   void implement(Code code, {List<Code>? supportingDeclarations}) {
-    parentClass?._implementedDeclarations.add(name);
-    _buffer.writeln('${returnType.toCode()} ${name}(');
-    for (var positional in positionalParameters) {
+    _buffer.writeln('${_definition.returnType.toCode()} ${_definition.name}(');
+    for (var positional in _definition.positionalParameters) {
       _buffer.writeln('${positional.type.toCode()} ${positional.name},');
     }
-    if (namedParameters.isNotEmpty) {
+    if (_definition.namedParameters.isNotEmpty) {
       _buffer.write(' {');
-      for (var named in namedParameters.values) {
+      for (var named in _definition.namedParameters.values) {
         _buffer.writeln(
             '${named.required ? 'required ' : ''}${named.type.toCode()} ${named.name},');
       }
@@ -453,37 +373,23 @@ class _ImplementableTargetMethodDefinition extends AnalyzerMethodDefinition
   }
 }
 
-class _ImplementableTargetConstructorDeclaration
-    extends AnalyzerConstructorDeclaration implements TargetMethodDeclaration {
+class _MacroConstructorDefinitionBuilder implements MethodDefinitionBuilder {
   final StringBuffer _buffer;
+  final MethodDefinition _definition;
+  final ClassDefinition definingClass;
 
-  _ImplementableTargetConstructorDeclaration(
-      ConstructorElement element, this._buffer)
-      : super(element);
-
-  @override
-  void addToClass(Code declaration) => _buffer.writeln(declaration);
-}
-
-class _ImplementableTargetConstructorDefinition
-    extends AnalyzerConstructorDefinition implements TargetMethodDefinition {
-  final StringBuffer _buffer;
-  final _ImplementableTargetClassDefinition parentClass;
-
-  _ImplementableTargetConstructorDefinition(
-      ConstructorElement element, this._buffer, this.parentClass)
-      : super(element);
+  _MacroConstructorDefinitionBuilder(
+      this._buffer, this._definition, this.definingClass);
 
   @override
   void implement(Code code, {List<Code>? supportingDeclarations}) {
-    parentClass._implementedDeclarations.add(name);
-    _buffer.writeln('${parentClass.name}.${name}(');
-    for (var positional in positionalParameters) {
+    _buffer.writeln('${definingClass.name}.${_definition.name}(');
+    for (var positional in _definition.positionalParameters) {
       _buffer.writeln('${positional.type.toCode()} ${positional.name},');
     }
-    if (namedParameters.isNotEmpty) {
+    if (_definition.namedParameters.isNotEmpty) {
       _buffer.write(' {');
-      for (var named in namedParameters.values) {
+      for (var named in _definition.namedParameters.values) {
         _buffer.writeln(
             '${named.required ? 'required ' : ''}${named.type.toCode()} ${named.name},');
       }
