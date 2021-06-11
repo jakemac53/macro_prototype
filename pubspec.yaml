@@ -7,3 +7,14 @@ dependencies:
   source_gen: ^1.0.2
 dev_dependencies:
   build_runner: ^2.0.0
+dependency_overrides:
+  analyzer:
+    git:
+      ref: fix-source-visitor
+      url: https://github.com/jakemac53/sdk.git
+      path: pkg/analyzer
+  meta:
+    git:
+      ref: fix-source-visitor
+      url: https://github.com/jakemac53/sdk.git
+      path: pkg/meta

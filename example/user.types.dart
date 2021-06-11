@@ -1,20 +1,21 @@
+import 'macros/data_class.dart';
 import 'macros/json.dart';
 
+@dataClass
 @jsonSerializable
 class User {
   String name;
-  User(this.name);
 }
 
+@dataClass
 @jsonSerializable
 class Group {
   final String name;
   final List<User> users;
-  Group(this.name, this.users);
 }
 
 @jsonSerializable
 class Manager extends User {
   final List<User> reports;
-  Manager(String name, this.reports) : super(name);
+  Manager({required String name, required this.reports}) : super(name: name);
 }
