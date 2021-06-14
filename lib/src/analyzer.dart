@@ -25,7 +25,7 @@ class AnalyzerTypeReference implements TypeReference {
 
   @override
   // TODO: Scope, once we have that
-  Code get reference => Code('$name${isNullable ? '?' : ''}');
+  Code get reference => Fragment('$name${isNullable ? '?' : ''}');
 }
 
 abstract class AnalyzerDeclarationType implements DeclarationType {

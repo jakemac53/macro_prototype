@@ -14,11 +14,11 @@ class ObservableMacro implements FieldDeclarationMacro {
           '${definition.name} was annotated.');
     }
     var publicName = definition.name.substring(1);
-    var getter = Code('${definition.type.toCode()} get $publicName => '
+    var getter = Fragment('${definition.type.toCode()} get $publicName => '
         '${definition.name};');
     builder.addToClass(getter);
 
-    var setter = Code('''
+    var setter = Fragment('''
 void set $publicName(${definition.type.toCode()} val) {
   print('Setting $publicName to \${val}');
   ${definition.name} = val;

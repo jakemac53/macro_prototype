@@ -8,9 +8,9 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     builder
-      ..addToClass(
-          Code('@jsonSerializable\nexternal Map<String, Object?> toJson();'))
-      ..addToClass(Code('@jsonSerializable\n'
+      ..addToClass(Fragment(
+          '@jsonSerializable\nexternal Map<String, Object?> toJson();'))
+      ..addToClass(Fragment('@jsonSerializable\n'
           'external ${declaration.name}.fromJson(Map<String, Object?> json);'));
   }
 
@@ -28,12 +28,12 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
 
   void _defineFromJson(
       MethodDefinition fromJson, MethodDefinitionBuilder builder) {
-    var code = Code(' : ');
+    var code = Fragment(' : ');
     var clazz = fromJson.definingClass!;
     var fields = clazz.fields.toList();
     for (var field in fields) {
-      code = Code(
-          '$code\n ${field.name} = ${_typeFromJson(field.type, Code('json["${field.name}"]'))}'
+      code = Fragment(
+          '$code\n ${field.name} = ${_typeFromJson(field.type, Fragment('json["${field.name}"]'))}'
           '${field != fields.last ? ',' : ''}');
     }
     // Need to call super constructors, we require they have a fromJson
@@ -44,54 +44,57 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
         throw UnsupportedError(
             '@jsonSerializable only works if applied to all superclasses.');
       }
-      code = Code('$code,\nsuper.fromJson(json)');
+      code = Fragment('$code,\nsuper.fromJson(json)');
     }
 
-    code = Code('$code;');
+    code = Fragment('$code;');
     builder.implement(code);
   }
 
   void _defineToJson(MethodDefinition toJson, MethodDefinitionBuilder builder) {
     var clazz = toJson.definingClass!;
-    var code = Code('=> <String, Object?>{\n');
     var allFields = <FieldDefinition>[...clazz.fields];
     var next = clazz.superclass;
     while (next is ClassDefinition && next.name != 'Object') {
       allFields.addAll(next.fields);
       next = next.superclass;
     }
+    var entries = <Code>[];
     for (var field in allFields) {
-      code = Code(
-          '$code  "${field.name}": ${_typeToJson(field.type, Code(field.name))},\n');
+      entries.add(Fragment(
+          '  "${field.name}": ${_typeToJson(field.type, Fragment(field.name))}, '));
     }
-    code = Code('$code};');
-    builder.implement(code);
+    var body =
+        FunctionBody.fromParts(['=> <String, Object?>{', ...entries, '};']);
+    builder.implement(body);
   }
 
   Code _typeFromJson(TypeDefinition type, Code jsonReference) {
     if (type.name == 'List') {
-      var typeArgFromJson = _typeFromJson(type.typeArguments.first, Code('e'));
-      return Code(
+      var typeArgFromJson =
+          _typeFromJson(type.typeArguments.first, Fragment('e'));
+      return Fragment(
           '[for (var e in $jsonReference as List<Object?>) $typeArgFromJson]');
     }
     if (_hasFromJson(type)) {
-      return Code(
+      return Fragment(
           '${type.name}.fromJson($jsonReference as Map<String, Object?>)');
     }
-    return Code('$jsonReference as ${type.toCode()}');
+    return Fragment('$jsonReference as ${type.toCode()}');
   }
 
   Code _typeToJson(TypeDefinition type, Code instanceReference) {
     if (type.name == 'List') {
-      var typeArgToJson = _typeToJson(type.typeArguments.first, Code('e'));
-      return Code('[for (var e in $instanceReference) $typeArgToJson]');
+      var typeArgToJson = _typeToJson(type.typeArguments.first, Fragment('e'));
+      return Fragment('[for (var e in $instanceReference) $typeArgToJson]');
     }
     var hasCompatibleToJson = type is ClassDefinition &&
         type.methods.any((element) =>
             element.name == 'toJson' &&
             element.returnType.name == 'Map' &&
             element.returnType.typeArguments.first.name == 'String');
-    return Code('$instanceReference${hasCompatibleToJson ? '.toJson()' : ''}');
+    return Fragment(
+        '$instanceReference${hasCompatibleToJson ? '.toJson()' : ''}');
   }
 
   bool _hasFromJson(TypeDefinition definition) =>

@@ -6,9 +6,7 @@ import 'macros/json.dart';
 class User {
   String name;
   @jsonSerializable
-  Map<String, Object?> toJson() => <String, Object?>{
-        "name": name,
-      };
+  Map<String, Object?> toJson() => <String, Object?>{"name": name};
 
   User copyWith({String? name}) => User(name: name == null ? this.name : name);
   bool operator ==(Object other) => other is User && this.name == other.name;
@@ -31,7 +29,7 @@ class Group {
   @jsonSerializable
   Map<String, Object?> toJson() => <String, Object?>{
         "name": name,
-        "users": [for (var e in users) e],
+        "users": [for (var e in users) e]
       };
 
   Group copyWith({String? name, List<User>? users}) => Group(
@@ -57,7 +55,7 @@ class Manager extends User {
   @jsonSerializable
   Map<String, Object?> toJson() => <String, Object?>{
         "reports": [for (var e in reports) e],
-        "name": name,
+        "name": name
       };
 
   @jsonSerializable

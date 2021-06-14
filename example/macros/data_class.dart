@@ -27,10 +27,10 @@ class _AutoConstructor implements ClassDeclarationMacro {
       throw ArgumentError(
           'Cannot generate a constructor because one already exists');
     }
-    var code = Code('${declaration.name}({');
+    var code = Fragment('${declaration.name}({');
     for (var field in declaration.fields) {
       var requiredKeyword = field.type.isNullable ? '' : 'required ';
-      code = Code('$code\n${requiredKeyword}this.${field.name},');
+      code = Fragment('$code\n${requiredKeyword}this.${field.name},');
     }
     var superclass = declaration.superclass;
     MethodDeclaration? superconstructor;
@@ -46,31 +46,31 @@ class _AutoConstructor implements ClassDeclarationMacro {
       // that would require access to those.
       for (var param in superconstructor.positionalParameters) {
         var requiredKeyword = param.type.isNullable ? '' : 'required ';
-        code = Code(
+        code = Fragment(
             '$code\n$requiredKeyword${param.type.toCode()} ${param.name},');
       }
       for (var param in superconstructor.namedParameters.values) {
         var requiredKeyword = param.required ? '' : 'required ';
-        code = Code(
+        code = Fragment(
             '$code\n$requiredKeyword${param.type.toCode()} ${param.name},');
       }
     }
-    code = Code('$code\n})');
+    code = Fragment('$code\n})');
     if (superconstructor != null) {
-      code = Code('$code : super(');
+      code = Fragment('$code : super(');
       for (var param in superconstructor.positionalParameters) {
-        code = Code('$code\n${param.name},');
+        code = Fragment('$code\n${param.name},');
       }
       if (superconstructor.namedParameters.isNotEmpty) {
-        code = Code('$code {');
+        code = Fragment('$code {');
         for (var param in superconstructor.namedParameters.values) {
-          code = Code('$code\n${param.name}: ${param.name},');
+          code = Fragment('$code\n${param.name}: ${param.name},');
         }
-        code = Code('$code\n}');
+        code = Fragment('$code\n}');
       }
-      code = Code('$code)');
+      code = Fragment('$code)');
     }
-    code = Code('$code;');
+    code = Fragment('$code;');
     builder.addToClass(code);
   }
 }
@@ -87,20 +87,20 @@ class _CopyWith implements ClassDeclarationMacro {
       throw ArgumentError(
           'Cannot generate a copyWith method because one already exists');
     }
-    var code = Code('${declaration.reference} copyWith({');
+    var code = Fragment('${declaration.reference} copyWith({');
     for (var field in declaration.allFields) {
-      code =
-          Code('$code${field.type.toCode()}${field.type.isNullable ? '' : '?'} '
-              '${field.name}, ');
+      code = Fragment(
+          '$code${field.type.toCode()}${field.type.isNullable ? '' : '?'} '
+          '${field.name}, ');
     }
     // TODO: We assume this constructor exists, but should check
-    code = Code('$code}) => ${declaration.reference}(');
+    code = Fragment('$code}) => ${declaration.reference}(');
     for (var field in declaration.allFields) {
-      code = Code(
+      code = Fragment(
           '$code${field.name}: ${field.name} == null ? this.${field.name} : '
           '${field.name}, ');
     }
-    code = Code('$code);');
+    code = Fragment('$code);');
     builder.addToClass(code);
   }
 }
@@ -112,13 +112,13 @@ class _HashCode implements ClassDeclarationMacro {
 
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    var code = Code('int get hashCode =>');
+    var code = Fragment('int get hashCode =>');
     var isFirst = true;
     for (var field in declaration.allFields) {
-      code = Code('$code ${isFirst ? '' : '^ '}${field.name}.hashCode');
+      code = Fragment('$code ${isFirst ? '' : '^ '}${field.name}.hashCode');
       isFirst = false;
     }
-    code = Code('$code;');
+    code = Fragment('$code;');
     builder.addToClass(code);
   }
 }
@@ -130,12 +130,12 @@ class _Equality implements ClassDeclarationMacro {
 
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    var code = Code(
+    var code = Fragment(
         'bool operator==(Object other) => other is ${declaration.reference}');
     for (var field in declaration.allFields) {
-      code = Code('$code && this.${field.name} == other.${field.name}');
+      code = Fragment('$code && this.${field.name} == other.${field.name}');
     }
-    code = Code('$code;');
+    code = Fragment('$code;');
     builder.addToClass(code);
   }
 }
@@ -147,16 +147,16 @@ class _ToString implements ClassDeclarationMacro {
 
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    var code = Code('''
+    var code = Fragment('''
 @override
 String toString() => \'\$\{${declaration.name}\} {''');
     var isFirst = true;
     for (var field in declaration.allFields) {
-      code =
-          Code('$code${isFirst ? '' : ', '}${field.name}: \$\{${field.name}\}');
+      code = Fragment(
+          '$code${isFirst ? '' : ', '}${field.name}: \$\{${field.name}\}');
       isFirst = false;
     }
-    code = Code('$code}\';');
+    code = Fragment('$code}\';');
     builder.addToClass(code);
   }
 }
