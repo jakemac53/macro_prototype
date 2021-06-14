@@ -27,7 +27,7 @@ class _AutoConstructor implements ClassDeclarationMacro {
       throw ArgumentError(
           'Cannot generate a constructor because one already exists');
     }
-    var code = Fragment('${declaration.name}({');
+    Code code = Fragment('${declaration.name}({');
     for (var field in declaration.fields) {
       var requiredKeyword = field.type.isNullable ? '' : 'required ';
       code = Fragment('$code\n${requiredKeyword}this.${field.name},');
@@ -70,7 +70,7 @@ class _AutoConstructor implements ClassDeclarationMacro {
       }
       code = Fragment('$code)');
     }
-    code = Fragment('$code;');
+    code = Declaration('$code;');
     builder.addToClass(code);
   }
 }
@@ -87,7 +87,7 @@ class _CopyWith implements ClassDeclarationMacro {
       throw ArgumentError(
           'Cannot generate a copyWith method because one already exists');
     }
-    var code = Fragment('${declaration.reference} copyWith({');
+    Code code = Fragment('${declaration.reference} copyWith({');
     for (var field in declaration.allFields) {
       code = Fragment(
           '$code${field.type.toCode()}${field.type.isNullable ? '' : '?'} '
@@ -100,7 +100,7 @@ class _CopyWith implements ClassDeclarationMacro {
           '$code${field.name}: ${field.name} == null ? this.${field.name} : '
           '${field.name}, ');
     }
-    code = Fragment('$code);');
+    code = Declaration('$code);');
     builder.addToClass(code);
   }
 }
@@ -112,13 +112,13 @@ class _HashCode implements ClassDeclarationMacro {
 
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    var code = Fragment('int get hashCode =>');
+    Code code = Fragment('int get hashCode =>');
     var isFirst = true;
     for (var field in declaration.allFields) {
       code = Fragment('$code ${isFirst ? '' : '^ '}${field.name}.hashCode');
       isFirst = false;
     }
-    code = Fragment('$code;');
+    code = Declaration('$code;');
     builder.addToClass(code);
   }
 }
@@ -130,12 +130,12 @@ class _Equality implements ClassDeclarationMacro {
 
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    var code = Fragment(
+    Code code = Fragment(
         'bool operator==(Object other) => other is ${declaration.reference}');
     for (var field in declaration.allFields) {
       code = Fragment('$code && this.${field.name} == other.${field.name}');
     }
-    code = Fragment('$code;');
+    code = Declaration('$code;');
     builder.addToClass(code);
   }
 }
@@ -147,7 +147,7 @@ class _ToString implements ClassDeclarationMacro {
 
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    var code = Fragment('''
+    Code code = Fragment('''
 @override
 String toString() => \'\$\{${declaration.name}\} {''');
     var isFirst = true;
@@ -156,7 +156,7 @@ String toString() => \'\$\{${declaration.name}\} {''');
           '$code${isFirst ? '' : ', '}${field.name}: \$\{${field.name}\}');
       isFirst = false;
     }
-    code = Fragment('$code}\';');
+    code = Declaration('$code}\';');
     builder.addToClass(code);
   }
 }

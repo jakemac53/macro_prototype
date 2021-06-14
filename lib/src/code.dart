@@ -28,18 +28,14 @@ class Fragment extends Code {
 
 /// A piece of code identifying a syntactically valid Declaration.
 class Declaration extends Code {
-  ast.Declaration _expression;
+  final String code;
 
-  String get code => _expression.toSource();
-
-  Declaration._(this._expression);
+  Declaration._(this.code);
 
   factory Declaration(String content) {
-    var decl = _withParserAndToken(
-        content,
-        (parser, _) =>
-            parser.parseTopLevelDeclaration(false) as ast.Declaration);
-    return Declaration._(decl);
+    // TODO: parse declarations, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return Declaration._(content);
   }
 
   /// Creates a [Declaration] from [parts], which must be [Code] objects or

@@ -8,9 +8,9 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     builder
-      ..addToClass(Fragment(
+      ..addToClass(Declaration(
           '@jsonSerializable\nexternal Map<String, Object?> toJson();'))
-      ..addToClass(Fragment('@jsonSerializable\n'
+      ..addToClass(Declaration('@jsonSerializable\n'
           'external ${declaration.name}.fromJson(Map<String, Object?> json);'));
   }
 
@@ -28,7 +28,7 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
 
   void _defineFromJson(
       MethodDefinition fromJson, MethodDefinitionBuilder builder) {
-    var code = Fragment(' : ');
+    Code code = Fragment(' : ');
     var clazz = fromJson.definingClass!;
     var fields = clazz.fields.toList();
     for (var field in fields) {
