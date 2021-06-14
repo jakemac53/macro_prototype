@@ -9,10 +9,14 @@ class _DataClass implements ClassDeclarationMacro {
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     autoConstructor.visitClassDeclaration(declaration, builder);
+    copyWith.visitClassDeclaration(declaration, builder);
+    hashCode.visitClassDeclaration(declaration, builder);
+    equality.visitClassDeclaration(declaration, builder);
+    toString.visitClassDeclaration(declaration, builder);
   }
 }
 
-const autoConstructor = const _AutoConstructor();
+const autoConstructor = _AutoConstructor();
 
 class _AutoConstructor implements ClassDeclarationMacro {
   const _AutoConstructor();
@@ -71,8 +75,9 @@ class _AutoConstructor implements ClassDeclarationMacro {
   }
 }
 
-const copyWith = const _CopyWith();
+const copyWith = _CopyWith();
 
+// TODO: How to deal with overriding nullable fields to `null`?
 class _CopyWith implements ClassDeclarationMacro {
   const _CopyWith();
 
@@ -81,6 +86,89 @@ class _CopyWith implements ClassDeclarationMacro {
     if (declaration.methods.any((c) => c.name == 'copyWith')) {
       throw ArgumentError(
           'Cannot generate a copyWith method because one already exists');
+    }
+    var code = Code('${declaration.reference} copyWith({');
+    for (var field in declaration.allFields) {
+      code =
+          Code('$code${field.type.toCode()}${field.type.isNullable ? '' : '?'} '
+              '${field.name}, ');
+    }
+    // TODO: We assume this constructor exists, but should check
+    code = Code('$code}) => ${declaration.reference}(');
+    for (var field in declaration.allFields) {
+      code = Code(
+          '$code${field.name}: ${field.name} == null ? this.${field.name} : '
+          '${field.name}, ');
+    }
+    code = Code('$code);');
+    builder.addToClass(code);
+  }
+}
+
+const hashCode = _HashCode();
+
+class _HashCode implements ClassDeclarationMacro {
+  const _HashCode();
+
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
+    var code = Code('int get hashCode =>');
+    var isFirst = true;
+    for (var field in declaration.allFields) {
+      code = Code('$code ${isFirst ? '' : '^ '}${field.name}.hashCode');
+      isFirst = false;
+    }
+    code = Code('$code;');
+    builder.addToClass(code);
+  }
+}
+
+const equality = _Equality();
+
+class _Equality implements ClassDeclarationMacro {
+  const _Equality();
+
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
+    var code = Code(
+        'bool operator==(Object other) => other is ${declaration.reference}');
+    for (var field in declaration.allFields) {
+      code = Code('$code && this.${field.name} == other.${field.name}');
+    }
+    code = Code('$code;');
+    builder.addToClass(code);
+  }
+}
+
+const toString = _ToString();
+
+class _ToString implements ClassDeclarationMacro {
+  const _ToString();
+
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder) {
+    var code = Code('''
+@override
+String toString() => \'\$\{${declaration.name}\} {''');
+    var isFirst = true;
+    for (var field in declaration.allFields) {
+      code =
+          Code('$code${isFirst ? '' : ', '}${field.name}: \$\{${field.name}\}');
+      isFirst = false;
+    }
+    code = Code('$code}\';');
+    builder.addToClass(code);
+  }
+}
+
+extension _AllFields on ClassDeclaration {
+  // Returns all fields from all super classes.
+  Iterable<FieldDeclaration> get allFields sync* {
+    yield* fields;
+    var next = superclass;
+    while (next is ClassDeclaration && next.name != 'Object') {
+      yield* next.fields;
+      next = next.superclass;
     }
   }
 }

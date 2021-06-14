@@ -10,12 +10,17 @@ class User {
         "name": name,
       };
 
+  User copyWith({String? name}) => User(name: name == null ? this.name : name);
+  bool operator ==(Object other) => other is User && this.name == other.name;
+  @override
+  String toString() => '${User} {name: ${name}}';
   @jsonSerializable
   User.fromJson(
     Map<String, Object?> json,
   ) : name = json["name"] as String;
 
   User({required this.name});
+  int get hashCode => name.hashCode;
 }
 
 @dataClass
@@ -29,6 +34,13 @@ class Group {
         "users": [for (var e in users) e],
       };
 
+  Group copyWith({String? name, List<User>? users}) => Group(
+      name: name == null ? this.name : name,
+      users: users == null ? this.users : users);
+  bool operator ==(Object other) =>
+      other is Group && this.name == other.name && this.users == other.users;
+  @override
+  String toString() => '${Group} {name: ${name}, users: ${users}}';
   @jsonSerializable
   Group.fromJson(
     Map<String, Object?> json,
@@ -36,6 +48,7 @@ class Group {
         users = [for (var e in json["users"] as List<Object?>) e as User];
 
   Group({required this.name, required this.users});
+  int get hashCode => name.hashCode ^ users.hashCode;
 }
 
 @jsonSerializable

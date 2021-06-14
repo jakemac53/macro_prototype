@@ -4,21 +4,33 @@ import 'observable.dart';
 import 'user.dart';
 
 void main() {
-  var user = User(name: 'jake');
-  print(user.toJson());
-  var user2 = User.fromJson(user.toJson());
-  assert(jsonEncode(user2.toJson()) == jsonEncode(user.toJson()));
+  var jake = User(name: 'jake');
+  print('toString: $jake');
+  print('jsonEncode(jake.toJson()): ${jsonEncode(jake.toJson())}');
+  var user2 = User.fromJson(jake.toJson());
+  print('round trip user equality: '
+      '${jsonEncode(user2.toJson()) == jsonEncode(jake.toJson())}');
 
-  var group = Group(name: 'just ${user.name}', users: [user]);
-  print(group.toJson());
+  var group = Group(name: 'just ${jake.name}', users: [jake]);
+  print('jsonEncode(group.toJson()): ${jsonEncode(group.toJson())}');
   var group2 = Group.fromJson(group.toJson());
-  assert(jsonEncode(group2.toJson()) == jsonEncode(group.toJson()));
 
-  var manager = Manager(name: 'leaf', reports: [user]);
-  print(manager.toJson());
+  print('round trip group equality: '
+      '${jsonEncode(group2.toJson()) == jsonEncode(group.toJson())}');
+
+  var manager = Manager(name: 'leaf', reports: [jake]);
+  print('jsonEncode(manager.toJson()): ${jsonEncode(manager.toJson())}');
   var manager2 = Manager.fromJson(manager.toJson());
-  assert(jsonEncode(manager2.toJson()) == jsonEncode(manager.toJson()));
+  print('round trip manager equality: '
+      '${jsonEncode(manager2.toJson()) == jsonEncode(manager.toJson())}');
 
   var observable = new ObservableThing('hello');
+  print('changing property of observable property:');
   observable.description = 'world';
+
+  var george = jake.copyWith(name: 'george');
+  print('jake.copyWith(name: \'george\') => $george');
+  print('george == jake => ${george == jake}');
+  print('jake == jake.copyWith() => ${jake == jake.copyWith()}');
+  print('george.hashCode => ${george.hashCode}');
 }

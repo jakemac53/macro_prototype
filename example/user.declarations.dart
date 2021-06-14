@@ -11,6 +11,16 @@ class User {
   User({
     required this.name,
   });
+  User copyWith({
+    String? name,
+  }) =>
+      User(
+        name: name == null ? this.name : name,
+      );
+  int get hashCode => name.hashCode;
+  bool operator ==(Object other) => other is User && this.name == other.name;
+  @override
+  String toString() => '${User} {name: ${name}}';
   String name;
 }
 
@@ -25,6 +35,19 @@ class Group {
     required this.name,
     required this.users,
   });
+  Group copyWith({
+    String? name,
+    List<User>? users,
+  }) =>
+      Group(
+        name: name == null ? this.name : name,
+        users: users == null ? this.users : users,
+      );
+  int get hashCode => name.hashCode ^ users.hashCode;
+  bool operator ==(Object other) =>
+      other is Group && this.name == other.name && this.users == other.users;
+  @override
+  String toString() => '${Group} {name: ${name}, users: ${users}}';
   final String name;
   final List<User> users;
 }
