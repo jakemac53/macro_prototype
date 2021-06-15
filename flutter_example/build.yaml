@@ -1,0 +1,13 @@
+targets:
+  $default:
+    builders:
+      flutter_example:macro_builder:
+        enabled: true
+
+builders:
+  macro_builder:
+    import: "lib/builders.dart"
+    builder_factories: ["typesBuilder", "declarationsBuilder", "definitionsBuilder"]
+    build_extensions: {".gen.dart": [".types.dart.", ".declarations.dart.", ".dart"]}
+    auto_apply: dependents
+    build_to: source
