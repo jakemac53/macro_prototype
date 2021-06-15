@@ -13,15 +13,6 @@ Widget _myApp(BuildContext context, {String? appTitle, String? homePageTitle}) {
       home: MyHomePage(title: homePageTitle ?? 'Flutter Demo Home Page'));
 }
 
-class MyApp extends StatelessWidget {
-  final String? appTitle;
-  final String? homePageTitle;
-  @override
-  Widget build(BuildContext context) =>
-      _myApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
-  const MyApp({this.appTitle, this.homePageTitle, Key? key}) : super(key: key);
-}
-
 class MyHomePage extends StatefulWidget {
   final String title;
   @override

@@ -35,6 +35,13 @@ abstract class _MacroBuilder extends Builder {
             TypeChecker.fromRuntime(macro.runtimeType): macro,
         };
 
+  _MacroBuilder.forSpecialAnnotation(
+      Map<Object, Macro> macros, this._inputExtension, this._outputExtension)
+      : macros = {
+          for (var entry in macros.entries)
+            TypeChecker.fromRuntime(entry.key.runtimeType): entry.value,
+        };
+
   @override
   Future<void> build(BuildStep buildStep) async {
     var resolver = await buildStep.resolver;
@@ -149,6 +156,9 @@ class TypesMacroBuilder extends _MacroBuilder {
   TypesMacroBuilder(Iterable<TypeMacro> macros)
       : super(macros, '.gen.dart', '.types.dart');
 
+  TypesMacroBuilder.forSpecialAnnotation(Map<Object, Macro> macros)
+      : super.forSpecialAnnotation(macros, '.gen.dart', '.types.dart');
+
   @override
   Future<List<String>?> maybeApplyMacro(
       TypeChecker checker,
@@ -173,6 +183,9 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
   DeclarationsMacroBuilder(Iterable<DeclarationMacro> macros)
       : super(macros, '.types.dart', '.declarations.dart');
 
+  DeclarationsMacroBuilder.forSpecialAnnotation(Map<Object, Macro> macros)
+      : super.forSpecialAnnotation(macros, '.types.dart', '.declarations.dart');
+
   @override
   Future<List<String>?> maybeApplyMacro(
       TypeChecker checker,
@@ -193,8 +206,7 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
       // TODO: return list of names of declarations modified
-    }
-    if (element is FieldElement) {
+    } else if (element is FieldElement) {
       if (macro is! FieldDeclarationMacro) {
         throw ArgumentError(
             'Macro $macro does not support running on fields but was found on '
@@ -214,6 +226,14 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
           AnalyzerMethodDeclaration(element as ExecutableElement),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
+    } else if (element is FunctionElement) {
+      if (macro is! FunctionDeclarationMacro) {
+        throw ArgumentError(
+            'Macro $macro does not support running on top level functions, '
+            'but was found on $element');
+      }
+      macro.visitFunctionDeclaration(AnalyzerMethodDeclaration(element),
+          _MacroLibraryDeclarationBuilder(libraryBuffer: libraryBuffer));
     }
   }
 }
@@ -221,6 +241,9 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
 class DefinitionsMacroBuilder extends _MacroBuilder {
   DefinitionsMacroBuilder(Iterable<DefinitionMacro> macros)
       : super(macros, '.declarations.dart', '.dart');
+
+  DefinitionsMacroBuilder.forSpecialAnnotation(Map<Object, Macro> macros)
+      : super.forSpecialAnnotation(macros, '.declarations.dart', '.dart');
 
   @override
   Future<List<String>?> maybeApplyMacro(
@@ -261,16 +284,15 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
             'but was found on $element');
       }
       var methodBuffer = StringBuffer();
-      MethodDefinitionBuilder builder;
+      FunctionDefinitionBuilder builder;
       MethodDefinition definition;
-      ClassDefinition parent;
-      parent =
+      var parent =
           AnalyzerClassDefinition(element.enclosingElement as ClassElement);
       if (element is MethodElement) {
         definition = AnalyzerMethodDefinition(element,
-            parentClass: element.enclosingElement as ClassElement?);
+            parentClass: element.enclosingElement as ClassElement);
         builder =
-            _MacroMethodDefinitionBuilder(methodBuffer, definition, parent);
+            _MacroFunctionDefinitionBuilder(methodBuffer, definition, parent);
       } else if (element is ConstructorElement) {
         definition = AnalyzerMethodDefinition(element,
             parentClass: element.enclosingElement);
@@ -289,6 +311,28 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         buffer.writeln(methodBuffer);
         return [(element as ExecutableElement).name];
       }
+    } else if (element is FunctionElement) {
+      if (macro is! FunctionDefinitionMacro) {
+        throw ArgumentError(
+            'Macro $macro does not support running on methods or constructors, '
+            'but was found on $element');
+      }
+      var fnBuffer = StringBuffer();
+      var definition = AnalyzerFunctionDefinition(element);
+      var parent =
+          AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+      var builder =
+          _MacroFunctionDefinitionBuilder(fnBuffer, definition, parent);
+      macro.visitFunctionDefinition(definition, builder);
+      if (fnBuffer.isNotEmpty) {
+        var node = (await resolver.astNodeFor(element, resolve: true))
+            as ast.AnnotatedNode;
+        for (var meta in node.metadata) {
+          buffer.writeln(meta.toSource());
+        }
+        buffer.writeln(fnBuffer);
+        return [element.name];
+      }
     }
   }
 }
@@ -302,20 +346,27 @@ class _MacroTypeBuilder implements TypeBuilder {
   void addTypeToLibary(Code declaration) => _libraryBuffer.writeln(declaration);
 }
 
-class _MacroClassDeclarationBuilder implements ClassDeclarationBuilder {
-  final StringBuffer _classBuffer;
+class _MacroLibraryDeclarationBuilder implements DeclarationBuilder {
   final StringBuffer _libraryBuffer;
+
+  _MacroLibraryDeclarationBuilder({required StringBuffer libraryBuffer})
+      : _libraryBuffer = libraryBuffer;
+
+  @override
+  void addToLibrary(Code declaration) => _libraryBuffer.writeln(declaration);
+}
+
+class _MacroClassDeclarationBuilder extends _MacroLibraryDeclarationBuilder
+    implements ClassDeclarationBuilder {
+  final StringBuffer _classBuffer;
 
   _MacroClassDeclarationBuilder(
       {required StringBuffer classBuffer, required StringBuffer libraryBuffer})
       : _classBuffer = classBuffer,
-        _libraryBuffer = libraryBuffer;
+        super(libraryBuffer: libraryBuffer);
 
   @override
   void addToClass(Code declaration) => _classBuffer.writeln(declaration);
-
-  @override
-  void addToLibrary(Code declaration) => _libraryBuffer.writeln(declaration);
 }
 
 class _MacroFieldDefinitionBuilder implements FieldDefinitionBuilder {
@@ -344,12 +395,12 @@ ${_definition.type.toCode()} ${_definition.name} = $body;''');
   }
 }
 
-class _MacroMethodDefinitionBuilder implements MethodDefinitionBuilder {
+class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
   final StringBuffer _buffer;
-  final MethodDefinition _definition;
+  final FunctionDefinition _definition;
   final ClassDefinition definingClass;
 
-  _MacroMethodDefinitionBuilder(
+  _MacroFunctionDefinitionBuilder(
       this._buffer, this._definition, this.definingClass);
 
   @override
@@ -373,7 +424,7 @@ class _MacroMethodDefinitionBuilder implements MethodDefinitionBuilder {
   }
 }
 
-class _MacroConstructorDefinitionBuilder implements MethodDefinitionBuilder {
+class _MacroConstructorDefinitionBuilder implements FunctionDefinitionBuilder {
   final StringBuffer _buffer;
   final MethodDefinition _definition;
   final ClassDefinition definingClass;

@@ -19,9 +19,7 @@ abstract class ClassDefinition implements TypeDefinition, ClassDeclaration {
   Iterable<TypeDefinition> get superinterfaces;
 }
 
-abstract class MethodDefinition implements MethodDeclaration {
-  ClassDefinition? get definingClass;
-
+abstract class FunctionDefinition implements FunctionDeclaration {
   String get name;
 
   TypeDefinition get returnType;
@@ -31,6 +29,11 @@ abstract class MethodDefinition implements MethodDeclaration {
   Map<String, ParameterDefinition> get namedParameters;
 
   Iterable<TypeParameterDefinition> get typeParameters;
+}
+
+abstract class MethodDefinition
+    implements FunctionDefinition, MethodDeclaration {
+  ClassDefinition get definingClass;
 }
 
 abstract class FieldDefinition implements FieldDeclaration {
@@ -59,6 +62,6 @@ abstract class FieldDefinitionBuilder {
       {List<Code>? supportingDeclarations});
 }
 
-abstract class MethodDefinitionBuilder {
+abstract class FunctionDefinitionBuilder {
   void implement(Code body, {List<Code>? supportingDeclarations});
 }

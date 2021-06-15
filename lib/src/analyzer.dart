@@ -275,10 +275,8 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   }
 }
 
-class AnalyzerMethodDeclaration implements MethodDeclaration {
-  final ExecutableElement element;
-
-  AnalyzerMethodDeclaration(this.element);
+abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
+  ExecutableElement get element;
 
   @override
   bool get isAbstract => element.isAbstract;
@@ -328,18 +326,25 @@ class AnalyzerMethodDeclaration implements MethodDeclaration {
   }
 }
 
-class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
-    implements MethodDefinition {
-  final ClassElement? _parentClass;
+class AnalyzerFunctionDeclaration with _AnalyzerFunctionDeclaration {
+  final ExecutableElement element;
+  AnalyzerFunctionDeclaration(this.element);
+}
 
-  AnalyzerMethodDefinition(ExecutableElement element,
-      {ClassElement? parentClass})
-      : _parentClass = parentClass,
-        super(element);
+class AnalyzerMethodDeclaration
+    with _AnalyzerFunctionDeclaration
+    implements MethodDeclaration {
+  final ExecutableElement element;
+
+  AnalyzerMethodDeclaration(this.element);
 
   @override
-  ClassDefinition? get definingClass =>
-      _parentClass == null ? null : AnalyzerClassDefinition(_parentClass!);
+  TypeReference get definingClass =>
+      AnalyzerTypeReference(element.enclosingElement as TypeDefiningElement);
+}
+
+abstract class _AnalyzerFunctionDefinition implements FunctionDefinition {
+  ExecutableElement get element;
 
   @override
   Map<String, ParameterDefinition> get namedParameters => {
@@ -368,10 +373,32 @@ class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
   }
 }
 
+class AnalyzerFunctionDefinition extends AnalyzerFunctionDeclaration
+    with _AnalyzerFunctionDefinition {
+  AnalyzerFunctionDefinition(ExecutableElement element) : super(element);
+}
+
+class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
+    with _AnalyzerFunctionDefinition
+    implements MethodDefinition {
+  final ClassElement parentClass;
+
+  AnalyzerMethodDefinition(ExecutableElement element,
+      {required this.parentClass})
+      : super(element);
+
+  @override
+  ClassDefinition get definingClass => AnalyzerClassDefinition(parentClass);
+}
+
 class AnalyzerConstructorDeclaration implements MethodDeclaration {
   final ConstructorElement element;
 
   AnalyzerConstructorDeclaration(this.element);
+
+  @override
+  TypeReference get definingClass =>
+      AnalyzerTypeReference(element.enclosingElement);
 
   @override
   bool get isAbstract => element.isAbstract;

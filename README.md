@@ -55,12 +55,29 @@ depending on which type of declaration your macro supports running on.
 
 ## Example Macros, Wiring Up a New Macro
 
+### VM example
+
 You can see some examples under `example/macros`.
 
 Once you create a macro you will need to add it to all the phases in which it
 should run, see the `typesBuilder`, `declarationsBuilder`, and
 `definitionsBuilder` methods in `example/builders.dart`, and pass in your new
 macro to the corresponding constructor for the phase in which it should run.
+
+### Flutter example
+
+You can see flutter examples under `flutter_example/macros`.
+
+Once you create a macro (under `flutter_example/lib/macros`) you will need to
+also create a special annotation class for it in
+`flutter_example/lib/annotations.dart`. This needs to be a separate class in
+order to avoid imports of `dart:mirrors` in the flutter application.
+
+Next you need to add your macro to all the phases in which it should run, see
+the `typesBuilder`, `declarationsBuilder`, and `definitionsBuilder` methods in
+`flutter_example/lib/builders.dart`. You should add a map entry where the key
+is the annotation for the macro, and the value is the macro that should be
+applied when that annotation is present.
 
 ## Using a Macro
 
@@ -76,8 +93,11 @@ build of your library (and only the appropriate info should be available).
 ## Running macros
 
 You will use the build_runner package to run builds, which you can run with the
-`pub run build_runner build` command. There is also a `watch` command you may
-want to use to get fast rebuilds.
+`pub run build_runner build` (or `flutter pub run build_runner build`) command.
+There is also a `watch` command you may want to use to get fast rebuilds.
 
-If you want to build and run an app in a single command, you can use the `run`
-command: `pub run build_runner run example/main.dart`.
+For vm apps if you want to build and run an app in a single command, you can
+use the `run` command: `pub run build_runner run example/main.dart`.
+
+For flutter apps you will need to run build_runner separately, and then launch
+the flutter app as normal.

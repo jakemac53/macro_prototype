@@ -15,7 +15,7 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   }
 
   void visitMethodDefinition(
-      MethodDefinition definition, MethodDefinitionBuilder builder) {
+      MethodDefinition definition, FunctionDefinitionBuilder builder) {
     switch (definition.name) {
       case 'fromJson':
         _defineFromJson(definition, builder);
@@ -27,9 +27,9 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   }
 
   void _defineFromJson(
-      MethodDefinition fromJson, MethodDefinitionBuilder builder) {
+      MethodDefinition fromJson, FunctionDefinitionBuilder builder) {
     Code code = Fragment(' : ');
-    var clazz = fromJson.definingClass!;
+    var clazz = fromJson.definingClass;
     var fields = clazz.fields.toList();
     for (var field in fields) {
       code = Fragment(
@@ -51,8 +51,9 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
     builder.implement(code);
   }
 
-  void _defineToJson(MethodDefinition toJson, MethodDefinitionBuilder builder) {
-    var clazz = toJson.definingClass!;
+  void _defineToJson(
+      MethodDefinition toJson, FunctionDefinitionBuilder builder) {
+    var clazz = toJson.definingClass;
     var allFields = <FieldDefinition>[...clazz.fields];
     var next = clazz.superclass;
     while (next is ClassDefinition && next.name != 'Object') {

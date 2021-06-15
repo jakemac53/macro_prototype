@@ -33,6 +33,20 @@ abstract class FieldDefinitionMacro implements DefinitionMacro {
       FieldDefinition definition, FieldDefinitionBuilder builder);
 }
 
+abstract class FunctionTypeMacro implements TypeMacro {
+  void visitFunctionType(FunctionType type, TypeBuilder builder);
+}
+
+abstract class FunctionDeclarationMacro implements DeclarationMacro {
+  void visitFunctionDeclaration(
+      FunctionDeclaration declaration, DeclarationBuilder builder);
+}
+
+abstract class FunctionDefinitionMacro implements DefinitionMacro {
+  void visitFunctionDefinition(
+      FunctionDefinition definition, FunctionDefinitionBuilder builder);
+}
+
 abstract class MethodTypeMacro implements TypeMacro {
   void visitMethodType(MethodType type, TypeBuilder builder);
 }
@@ -44,5 +58,5 @@ abstract class MethodDeclarationMacro implements DeclarationMacro {
 
 abstract class MethodDefinitionMacro implements DefinitionMacro {
   void visitMethodDefinition(
-      MethodDefinition definition, MethodDefinitionBuilder builder);
+      MethodDefinition definition, FunctionDefinitionBuilder builder);
 }

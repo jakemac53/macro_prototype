@@ -21,7 +21,7 @@ abstract class ClassDeclaration implements TypeDeclaration, ClassType {
   Iterable<TypeDeclaration> get superinterfaces;
 }
 
-abstract class MethodDeclaration implements MethodType {
+abstract class FunctionDeclaration implements FunctionType {
   TypeDeclaration get returnType;
 
   Iterable<ParameterDeclaration> get positionalParameters;
@@ -30,6 +30,8 @@ abstract class MethodDeclaration implements MethodType {
 
   Iterable<TypeParameterDeclaration> get typeParameters;
 }
+
+abstract class MethodDeclaration implements FunctionDeclaration, MethodType {}
 
 abstract class FieldDeclaration implements FieldType {
   String get name;

@@ -25,7 +25,7 @@ abstract class ClassType implements TypeReference, DeclarationType {
   Iterable<TypeReference> get superinterfaces;
 }
 
-abstract class MethodType implements DeclarationType {
+abstract class FunctionType implements DeclarationType {
   bool get isGetter;
 
   bool get isSetter;
@@ -37,6 +37,10 @@ abstract class MethodType implements DeclarationType {
   Map<String, ParameterType> get namedParameters;
 
   Iterable<TypeParameterType> get typeParameters;
+}
+
+abstract class MethodType implements FunctionType {
+  TypeReference get definingClass;
 }
 
 abstract class FieldType implements DeclarationType {
