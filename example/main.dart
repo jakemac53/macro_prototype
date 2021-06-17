@@ -24,7 +24,7 @@ void main() {
   print('round trip manager equality: '
       '${jsonEncode(manager2.toJson()) == jsonEncode(manager.toJson())}');
 
-  var observable = new ObservableThing('hello');
+  var observable = ObservableThing('hello');
   print('changing property of observable property:');
   observable.description = 'world';
 

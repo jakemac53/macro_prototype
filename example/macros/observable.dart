@@ -5,6 +5,7 @@ const observable = ObservableMacro();
 class ObservableMacro implements FieldDeclarationMacro {
   const ObservableMacro();
 
+  @override
   void visitFieldDeclaration(
       FieldDeclaration definition, ClassDeclarationBuilder builder) {
     if (!definition.name.startsWith('_')) {

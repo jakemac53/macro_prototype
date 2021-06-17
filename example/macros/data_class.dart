@@ -1,11 +1,12 @@
 import 'package:collection/collection.dart';
 import 'package:macro_builder/macro_builder.dart';
 
-const dataClass = const _DataClass();
+const dataClass = _DataClass();
 
 class _DataClass implements ClassDeclarationMacro {
   const _DataClass();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     autoConstructor.visitClassDeclaration(declaration, builder);
@@ -21,6 +22,7 @@ const autoConstructor = _AutoConstructor();
 class _AutoConstructor implements ClassDeclarationMacro {
   const _AutoConstructor();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     if (declaration.constructors.any((c) => c.name == '')) {
@@ -81,6 +83,7 @@ const copyWith = _CopyWith();
 class _CopyWith implements ClassDeclarationMacro {
   const _CopyWith();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     if (declaration.methods.any((c) => c.name == 'copyWith')) {
@@ -110,6 +113,7 @@ const hashCode = _HashCode();
 class _HashCode implements ClassDeclarationMacro {
   const _HashCode();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     Code code = Fragment('int get hashCode =>');
@@ -128,6 +132,7 @@ const equality = _Equality();
 class _Equality implements ClassDeclarationMacro {
   const _Equality();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     Code code = Fragment(
@@ -145,15 +150,16 @@ const toString = _ToString();
 class _ToString implements ClassDeclarationMacro {
   const _ToString();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     Code code = Fragment('''
 @override
-String toString() => \'\$\{${declaration.name}\} {''');
+String toString() => '\${${declaration.name}} {''');
     var isFirst = true;
     for (var field in declaration.allFields) {
       code = Fragment(
-          '$code${isFirst ? '' : ', '}${field.name}: \$\{${field.name}\}');
+          '$code${isFirst ? '' : ', '}${field.name}: \${${field.name}}');
       isFirst = false;
     }
     code = Declaration('$code}\';');

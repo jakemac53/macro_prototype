@@ -2,53 +2,70 @@ import 'code.dart';
 import 'declarations.dart';
 
 abstract class TypeDefinition implements TypeDeclaration {
+  @override
   Iterable<TypeDefinition> get typeArguments;
 
+  @override
   Iterable<TypeParameterDefinition> get typeParameters;
 }
 
 abstract class ClassDefinition implements TypeDefinition, ClassDeclaration {
+  @override
   Iterable<MethodDefinition> get constructors;
 
+  @override
   Iterable<MethodDefinition> get methods;
 
+  @override
   Iterable<FieldDefinition> get fields;
 
+  @override
   ClassDefinition? get superclass;
 
+  @override
   Iterable<TypeDefinition> get superinterfaces;
 }
 
 abstract class FunctionDefinition implements FunctionDeclaration {
+  @override
   String get name;
 
+  @override
   TypeDefinition get returnType;
 
+  @override
   Iterable<ParameterDefinition> get positionalParameters;
 
+  @override
   Map<String, ParameterDefinition> get namedParameters;
 
+  @override
   Iterable<TypeParameterDefinition> get typeParameters;
 }
 
 abstract class MethodDefinition
     implements FunctionDefinition, MethodDeclaration {
+  @override
   ClassDefinition get definingClass;
 }
 
 abstract class FieldDefinition implements FieldDeclaration {
   ClassDefinition? get definingClass;
 
+  @override
   String get name;
 
+  @override
   TypeDefinition get type;
 }
 
 abstract class ParameterDefinition implements ParameterDeclaration {
+  @override
   TypeDefinition get type;
 }
 
 abstract class TypeParameterDefinition implements TypeParameterDeclaration {
+  @override
   TypeDefinition? get bounds;
 }
 

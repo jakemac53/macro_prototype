@@ -38,6 +38,7 @@ class MyHomePage extends StatefulWidget {
 
 @autoDispose
 class _MyHomePageState extends State<MyHomePage> {
+  @override
   @autoDispose
   external void dispose();
 

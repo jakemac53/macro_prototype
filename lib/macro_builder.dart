@@ -24,6 +24,7 @@ abstract class _MacroBuilder extends Builder {
   final String _inputExtension;
   final String _outputExtension;
 
+  @override
   Map<String, List<String>> get buildExtensions => {
         _inputExtension: [_outputExtension]
       };
@@ -44,7 +45,7 @@ abstract class _MacroBuilder extends Builder {
 
   @override
   Future<void> build(BuildStep buildStep) async {
-    var resolver = await buildStep.resolver;
+    var resolver = buildStep.resolver;
     var library = await buildStep.inputLibrary;
     var buffer = StringBuffer();
     var ast = await resolver.compilationUnitFor(buildStep.inputId);

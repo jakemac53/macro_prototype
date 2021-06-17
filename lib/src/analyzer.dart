@@ -324,6 +324,7 @@ abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
 }
 
 class AnalyzerFunctionDeclaration with _AnalyzerFunctionDeclaration {
+  @override
   final ExecutableElement element;
   AnalyzerFunctionDeclaration(this.element);
 }
@@ -331,6 +332,7 @@ class AnalyzerFunctionDeclaration with _AnalyzerFunctionDeclaration {
 class AnalyzerMethodDeclaration
     with _AnalyzerFunctionDeclaration
     implements MethodDeclaration {
+  @override
   final ExecutableElement element;
 
   AnalyzerMethodDeclaration(this.element);
@@ -450,6 +452,7 @@ class AnalyzerConstructorDefinition extends AnalyzerConstructorDeclaration
       : _parentClass = parentClass,
         super(element);
 
+  @override
   ClassDefinition get definingClass => AnalyzerClassDefinition(_parentClass);
 
   @override
@@ -507,6 +510,7 @@ class AnalyzerFieldDefinition extends AnalyzerFieldDeclaration
       : _parentClass = parentClass,
         super(element);
 
+  @override
   ClassDefinition? get definingClass =>
       _parentClass == null ? null : AnalyzerClassDefinition(_parentClass!);
 

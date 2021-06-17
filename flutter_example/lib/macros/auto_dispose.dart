@@ -17,6 +17,7 @@ class _AutoDisposeMacro
     }
 
     builder.addToClass(Declaration('''
+@override
 @autoDispose
 external void dispose(); 
 '''));
@@ -36,7 +37,8 @@ external void dispose();
     // Provide a full implementation if not yet implemented, otherwise just
     // prepend extra calls.
     if (definition.isAbstract || definition.isExternal) {
-      builder.implement(FunctionBody.fromParts(['{', ...disposeCalls, '}']));
+      builder.implement(FunctionBody.fromParts(
+          ['{', Statement('super.dispose();'), ...disposeCalls, '}']));
     } else {
       builder.wrapBody(before: disposeCalls);
     }

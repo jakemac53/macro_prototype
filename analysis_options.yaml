@@ -9,5 +9,5 @@ analyzer:
     - '**/*.declarations.dart'
 linter:
   rules:
-    - unawaited_futures
-    - unnecessary_overrides
+    unawaited_futures: true
+    implementation_imports: false

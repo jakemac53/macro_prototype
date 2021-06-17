@@ -15,18 +15,21 @@ abstract class Scope {}
 abstract class Code {
   String get code;
 
+  @override
   String toString() => code;
 }
 
 /// A piece of code that can't be parsed into a valid language construct in its
 /// current form. No validation or parsing is performed.
 class Fragment extends Code {
+  @override
   final String code;
 
   Fragment(this.code);
 }
 
 class Block extends Code {
+  @override
   final String code;
 
   Block._(this.code);
@@ -44,6 +47,7 @@ class Block extends Code {
 
 /// A piece of code identifying a syntactically valid Declaration.
 class Declaration extends Code {
+  @override
   final String code;
 
   Declaration._(this.code);
@@ -63,6 +67,7 @@ class Declaration extends Code {
 class Expression extends Code {
   ast.Expression _expression;
 
+  @override
   String get code => _expression.toSource();
 
   Expression._(this._expression);
@@ -82,6 +87,7 @@ class Expression extends Code {
 class FunctionBody extends Code {
   ast.FunctionBody _body;
 
+  @override
   String get code => _body.toSource();
 
   FunctionBody._(this._body);
@@ -102,6 +108,7 @@ class FunctionBody extends Code {
 
 /// A piece of code identifying a reference to an identifier.
 class Reference extends Code {
+  @override
   final String code;
 
   Reference._(this.code);
@@ -121,6 +128,7 @@ class Reference extends Code {
 class Statement extends Code {
   ast.Statement _statement;
 
+  @override
   String get code => _statement.toSource();
 
   Statement._(this._statement);

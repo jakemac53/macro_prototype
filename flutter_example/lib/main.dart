@@ -33,8 +33,10 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final disposable = SimpleDisposable();
   int _counter = 0;
+  @override
   @autoDispose
   void dispose() {
+    super.dispose();
     disposable.dispose();
   }
 

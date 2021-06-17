@@ -5,6 +5,7 @@ const jsonSerializable = _JsonMacro();
 class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   const _JsonMacro();
 
+  @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
     builder
@@ -14,6 +15,7 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
           'external ${declaration.name}.fromJson(Map<String, Object?> json);'));
   }
 
+  @override
   void visitMethodDefinition(
       MethodDefinition definition, FunctionDefinitionBuilder builder) {
     switch (definition.name) {
