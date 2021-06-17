@@ -29,17 +29,9 @@ class MyHomePage extends StatefulWidget {
   const MyHomePage({Key? key, required this.title}) : super(key: key);
 }
 
-@autoDispose
 class _MyHomePageState extends State<MyHomePage> {
   final disposable = SimpleDisposable();
   int _counter = 0;
-  @override
-  @autoDispose
-  void dispose() {
-    super.dispose();
-    disposable.dispose();
-  }
-
   void _incrementCounter() {
     setState(() {
       _counter++;
@@ -61,6 +53,18 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: _incrementCounter,
             tooltip: 'Increment',
             child: const Icon(Icons.add)));
+  }
+
+  @override
+  @autoDispose
+  void dispose() {
+    void $original() {
+      super.dispose();
+    }
+
+    disposable.dispose();
+    var $ret = $original();
+    return $ret;
   }
 }
 

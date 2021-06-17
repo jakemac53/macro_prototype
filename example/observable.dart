@@ -6,7 +6,7 @@ class ObservableThing {
   ObservableThing(this._description);
   String get description => _description;
   set description(String val) {
-    print('Setting description to $val');
+    print('Setting description to ${val}');
     _description = val;
   }
 }

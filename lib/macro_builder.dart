@@ -183,13 +183,20 @@ class TypesMacroBuilder extends _MacroBuilder {
       StringBuffer libraryBuffer,
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
-    if (macro is ClassTypeMacro) {
-      if (element is! ClassElement) {
-        throw ArgumentError(
-            'Macro $macro can only be used on classes, but was found on $element');
-      }
+    _checkValidMacroApplication(element, macro);
+    if (macro is ClassTypeMacro && element is ClassElement) {
       macro.visitClassType(
           AnalyzerClassType(element), _MacroTypeBuilder(libraryBuffer));
+    } else if (element is FieldElement && macro is FieldTypeMacro) {
+      throw UnimplementedError(
+          'FieldTypeMacro is not implemented in this prototype');
+    } else if ((element is MethodElement || element is ConstructorElement) &&
+        macro is MethodTypeMacro) {
+      throw UnimplementedError(
+          'MethodTypeMacro is not implemented in this prototype');
+    } else if (element is FunctionElement && macro is FunctionTypeMacro) {
+      throw UnimplementedError(
+          'FunctionTypeMacro is not implemented in this prototype');
     }
   }
 }
@@ -211,43 +218,27 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       StringBuffer libraryBuffer,
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
-    if (element is ClassElement) {
-      if (macro is! ClassDeclarationMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on classes but was found on '
-            '$element');
-      }
+    _checkValidMacroApplication(element, macro);
+    if (element is ClassElement && macro is ClassDeclarationMacro) {
       macro.visitClassDeclaration(
           AnalyzerClassDeclaration(element),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
+
       // TODO: return list of names of declarations modified
-    } else if (element is FieldElement) {
-      if (macro is! FieldDeclarationMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on fields but was found on '
-            '$element');
-      }
+    } else if (element is FieldElement && macro is FieldDeclarationMacro) {
       macro.visitFieldDeclaration(
           AnalyzerFieldDeclaration(element),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
-    } else if (element is MethodElement || element is ConstructorElement) {
-      if (macro is! MethodDeclarationMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on methods or constructors, '
-            'but was found on $element');
-      }
+    } else if ((element is MethodElement || element is ConstructorElement) &&
+        macro is MethodDeclarationMacro) {
       macro.visitMethodDeclaration(
           AnalyzerMethodDeclaration(element as ExecutableElement),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
-    } else if (element is FunctionElement) {
-      if (macro is! FunctionDeclarationMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on top level functions, '
-            'but was found on $element');
-      }
+    } else if (element is FunctionElement &&
+        macro is FunctionDeclarationMacro) {
       macro.visitFunctionDeclaration(AnalyzerMethodDeclaration(element),
           _MacroLibraryDeclarationBuilder(libraryBuffer: libraryBuffer));
     }
@@ -271,12 +262,8 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       StringBuffer libraryBuffer,
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
-    if (element is FieldElement) {
-      if (macro is! FieldDefinitionMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on fields but was found on '
-            '$element');
-      }
+    _checkValidMacroApplication(element, macro);
+    if (element is FieldElement && macro is FieldDefinitionMacro) {
       var fieldBuffer = StringBuffer();
       var definition = AnalyzerFieldDefinition(element,
           parentClass: element.enclosingElement as ClassElement?);
@@ -294,12 +281,8 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         buffer.writeln(fieldBuffer);
         return [element.name];
       }
-    } else if (element is MethodElement || element is ConstructorElement) {
-      if (macro is! MethodDefinitionMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on methods or constructors, '
-            'but was found on $element');
-      }
+    } else if ((element is MethodElement || element is ConstructorElement) &&
+        macro is MethodDefinitionMacro) {
       var methodBuffer = StringBuffer();
       FunctionDefinitionBuilder builder;
       MethodDefinition definition;
@@ -328,12 +311,7 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         buffer.writeln(methodBuffer);
         return [(element as ExecutableElement).name];
       }
-    } else if (element is FunctionElement) {
-      if (macro is! FunctionDefinitionMacro) {
-        throw ArgumentError(
-            'Macro $macro does not support running on methods or constructors, '
-            'but was found on $element');
-      }
+    } else if (element is FunctionElement && macro is FunctionDefinitionMacro) {
       var fnBuffer = StringBuffer();
       var definition = AnalyzerFunctionDefinition(element);
       var parent =
@@ -350,6 +328,43 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         buffer.writeln(fnBuffer);
         return [element.name];
       }
+    }
+  }
+}
+
+/// Throws if [element] is annotated with a macro that doesn't support that
+/// type of declaration.
+void _checkValidMacroApplication(Element element, Macro macro) {
+  if (element is ClassElement) {
+    if (macro is! ClassTypeMacro && macro is! ClassDeclarationMacro) {
+      throw ArgumentError(
+          'Macro $macro does not support running on classes but was found on '
+          '$element');
+    }
+    // TODO: return list of names of declarations modified
+  } else if (element is FieldElement) {
+    if (macro is! FieldTypeMacro &&
+        macro is! FieldDeclarationMacro &&
+        macro is! FieldDefinitionMacro) {
+      throw ArgumentError(
+          'Macro $macro does not support running on fields but was found on '
+          '$element');
+    }
+  } else if (element is MethodElement || element is ConstructorElement) {
+    if (macro is! MethodTypeMacro &&
+        macro is! MethodDeclarationMacro &&
+        macro is! MethodDefinitionMacro) {
+      throw ArgumentError(
+          'Macro $macro does not support running on methods or constructors, '
+          'but was found on $element');
+    }
+  } else if (element is FunctionElement) {
+    if (macro is! FunctionType &&
+        macro is! FunctionDeclarationMacro &&
+        macro is! FunctionDefinitionMacro) {
+      throw ArgumentError(
+          'Macro $macro does not support running on top level functions, '
+          'but was found on $element');
     }
   }
 }
@@ -469,15 +484,17 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
       throw UnsupportedError(
           'Only block function bodies can be wrapped but got $body.');
     }
+
+    // Write everything up to the first open curly bracket
+    _buffer.write(_originalSource.substring(
+        node.firstTokenAfterCommentAndMetadata.offset,
+        body.block.leftBracket.offset + 1));
+
     // Write out the local function which is identical to the original
     _buffer.write(_originalSource
         .substring(node.firstTokenAfterCommentAndMetadata.offset, node.end + 1)
         // Alert! Hack incoming :D
-        .replaceFirst(_definition.name, '_original'));
-
-    // Write everything up to the first open curly bracket
-    _buffer.write(_originalSource.substring(
-        node.offset, body.block.leftBracket.offset + 1));
+        .replaceFirst(_definition.name, '\$original'));
 
     // Write out the before statements
     for (var stmt in before) {
@@ -485,7 +502,7 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
     }
 
     // Invocation of `original`.
-    _buffer.writeln('var \$ret = original');
+    _buffer.writeln('var \$ret = \$original');
 
     // Type args
     if (typeParams != null) {

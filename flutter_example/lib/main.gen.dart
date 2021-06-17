@@ -32,7 +32,6 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-@autoDispose
 class _MyHomePageState extends State<MyHomePage> {
   final disposable = SimpleDisposable();
   int _counter = 0;
@@ -98,6 +97,12 @@ class _MyHomePageState extends State<MyHomePage> {
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+
+  @override
+  @autoDispose
+  void dispose() {
+    super.dispose();
   }
 }
 

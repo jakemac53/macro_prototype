@@ -15,9 +15,10 @@ class User {
     String? name,
   }) =>
       User(
-        name: name == null ? this.name : name,
+        name: name ?? this.name,
       );
   int get hashCode => name.hashCode;
+  @override
   bool operator ==(Object other) => other is User && this.name == other.name;
   @override
   String toString() => '${User} {name: ${name}}';
@@ -40,10 +41,11 @@ class Group {
     List<User>? users,
   }) =>
       Group(
-        name: name == null ? this.name : name,
-        users: users == null ? this.users : users,
+        name: name ?? this.name,
+        users: users ?? this.users,
       );
   int get hashCode => name.hashCode ^ users.hashCode;
+  @override
   bool operator ==(Object other) =>
       other is Group && this.name == other.name && this.users == other.users;
   @override

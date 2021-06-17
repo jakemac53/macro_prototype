@@ -20,7 +20,7 @@ class ObservableMacro implements FieldDeclarationMacro {
     builder.addToClass(getter);
 
     var setter = Declaration('''
-void set $publicName(${definition.type.toCode()} val) {
+set $publicName(${definition.type.toCode()} val) {
   print('Setting $publicName to \${val}');
   ${definition.name} = val;
 }''');

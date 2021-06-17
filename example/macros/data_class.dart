@@ -99,9 +99,8 @@ class _CopyWith implements ClassDeclarationMacro {
     // TODO: We assume this constructor exists, but should check
     code = Fragment('$code}) => ${declaration.reference}(');
     for (var field in declaration.allFields) {
-      code = Fragment(
-          '$code${field.name}: ${field.name} == null ? this.${field.name} : '
-          '${field.name}, ');
+      code =
+          Fragment('$code${field.name}: ${field.name}?? this.${field.name}, ');
     }
     code = Declaration('$code);');
     builder.addToClass(code);
@@ -135,8 +134,9 @@ class _Equality implements ClassDeclarationMacro {
   @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    Code code = Fragment(
-        'bool operator==(Object other) => other is ${declaration.reference}');
+    Code code = Fragment('''
+@override
+bool operator==(Object other) => other is ${declaration.reference}''');
     for (var field in declaration.allFields) {
       code = Fragment('$code && this.${field.name} == other.${field.name}');
     }
