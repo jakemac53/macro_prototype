@@ -16,7 +16,7 @@ abstract class ClassDeclaration implements TypeDeclaration, ClassType {
 
   Iterable<MethodDeclaration> get methods;
 
-  TypeDeclaration? get superclass;
+  ClassDeclaration? get superclass;
 
   Iterable<TypeDeclaration> get superinterfaces;
 }

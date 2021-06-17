@@ -94,8 +94,14 @@ abstract class _MacroBuilder extends Builder {
       classBuffer.writeln(originalSource.substring(start, end + 1));
 
       for (var checker in macros.keys) {
-        implementedDecls.addAll(await maybeApplyMacro(checker, macros[checker]!,
-                element, resolver, classBuffer, libraryBuffer) ??
+        implementedDecls.addAll(await maybeApplyMacro(
+                checker,
+                macros[checker]!,
+                element,
+                resolver,
+                classBuffer,
+                libraryBuffer,
+                originalSource) ??
             const []);
       }
       for (var field in element.fields) {
@@ -123,8 +129,14 @@ abstract class _MacroBuilder extends Builder {
     } else {
       var memberBuffer = StringBuffer();
       for (var checker in macros.keys) {
-        implementedDecls.addAll(await maybeApplyMacro(checker, macros[checker]!,
-                element, resolver, memberBuffer, libraryBuffer) ??
+        implementedDecls.addAll(await maybeApplyMacro(
+                checker,
+                macros[checker]!,
+                element,
+                resolver,
+                memberBuffer,
+                libraryBuffer,
+                originalSource) ??
             const []);
       }
 
@@ -149,7 +161,8 @@ abstract class _MacroBuilder extends Builder {
       Element element,
       Resolver resolver,
       StringBuffer buffer,
-      StringBuffer libraryBuffer);
+      StringBuffer libraryBuffer,
+      String originalSource);
 }
 
 class TypesMacroBuilder extends _MacroBuilder {
@@ -166,7 +179,8 @@ class TypesMacroBuilder extends _MacroBuilder {
       Element element,
       Resolver resolver,
       StringBuffer buffer,
-      StringBuffer libraryBuffer) async {
+      StringBuffer libraryBuffer,
+      String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     if (macro is ClassTypeMacro) {
       if (element is! ClassElement) {
@@ -193,7 +207,8 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       Element element,
       Resolver resolver,
       StringBuffer buffer,
-      StringBuffer libraryBuffer) async {
+      StringBuffer libraryBuffer,
+      String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     if (element is ClassElement) {
       if (macro is! ClassDeclarationMacro) {
@@ -252,7 +267,8 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       Element element,
       Resolver resolver,
       StringBuffer buffer,
-      StringBuffer libraryBuffer) async {
+      StringBuffer libraryBuffer,
+      String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     if (element is FieldElement) {
       if (macro is! FieldDefinitionMacro) {
@@ -288,11 +304,13 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       MethodDefinition definition;
       var parent =
           AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+      var node = (await resolver.astNodeFor(element, resolve: true))
+          as ast.Declaration;
       if (element is MethodElement) {
         definition = AnalyzerMethodDefinition(element,
             parentClass: element.enclosingElement as ClassElement);
-        builder =
-            _MacroFunctionDefinitionBuilder(methodBuffer, definition, parent);
+        builder = _MacroFunctionDefinitionBuilder(
+            methodBuffer, definition, parent, node, originalSource);
       } else if (element is ConstructorElement) {
         definition = AnalyzerMethodDefinition(element,
             parentClass: element.enclosingElement);
@@ -303,8 +321,6 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       }
       macro.visitMethodDefinition(definition, builder);
       if (methodBuffer.isNotEmpty) {
-        var node = (await resolver.astNodeFor(element, resolve: true))
-            as ast.AnnotatedNode;
         for (var meta in node.metadata) {
           buffer.writeln(meta.toSource());
         }
@@ -321,12 +337,12 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       var definition = AnalyzerFunctionDefinition(element);
       var parent =
           AnalyzerClassDefinition(element.enclosingElement as ClassElement);
-      var builder =
-          _MacroFunctionDefinitionBuilder(fnBuffer, definition, parent);
+      var node = (await resolver.astNodeFor(element, resolve: true))
+          as ast.Declaration;
+      var builder = _MacroFunctionDefinitionBuilder(
+          fnBuffer, definition, parent, node, originalSource);
       macro.visitFunctionDefinition(definition, builder);
       if (fnBuffer.isNotEmpty) {
-        var node = (await resolver.astNodeFor(element, resolve: true))
-            as ast.AnnotatedNode;
         for (var meta in node.metadata) {
           buffer.writeln(meta.toSource());
         }
@@ -399,9 +415,11 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
   final StringBuffer _buffer;
   final FunctionDefinition _definition;
   final ClassDefinition definingClass;
+  final ast.Declaration _node;
+  final String _originalSource;
 
-  _MacroFunctionDefinitionBuilder(
-      this._buffer, this._definition, this.definingClass);
+  _MacroFunctionDefinitionBuilder(this._buffer, this._definition,
+      this.definingClass, this._node, this._originalSource);
 
   @override
   void implement(Code code, {List<Code>? supportingDeclarations}) {
@@ -421,6 +439,81 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
     _buffer.write('$code');
 
     supportingDeclarations?.forEach(_buffer.writeln);
+  }
+
+  @override
+  void wrapBody(
+      {List<Statement>? before,
+      List<Statement>? after,
+      List<Declaration>? supportingDeclarations}) {
+    before ??= const [];
+    after ??= const [];
+    var node = _node;
+    ast.FunctionBody body;
+    ast.TypeParameterList? typeParams;
+    ast.FormalParameterList? formalParams;
+    if (node is ast.MethodDeclaration) {
+      body = node.body;
+      typeParams = node.typeParameters;
+      formalParams = node.parameters;
+    } else if (node is ast.FunctionDeclaration) {
+      body = node.functionExpression.body;
+      typeParams = node.functionExpression.typeParameters;
+      formalParams = node.functionExpression.parameters;
+    } else {
+      throw UnsupportedError(
+          'Can only wrap normal functions and methods but got $_node');
+    }
+    if (body is! ast.BlockFunctionBody) {
+      throw UnsupportedError(
+          'Only block function bodies can be wrapped but got $body.');
+    }
+    // Write out the local function which is identical to the original
+    _buffer.write(_originalSource
+        .substring(node.firstTokenAfterCommentAndMetadata.offset, node.end + 1)
+        // Alert! Hack incoming :D
+        .replaceFirst(_definition.name, '_original'));
+
+    // Write everything up to the first open curly bracket
+    _buffer.write(_originalSource.substring(
+        node.offset, body.block.leftBracket.offset + 1));
+
+    // Write out the before statements
+    for (var stmt in before) {
+      _buffer.writeln(stmt.code);
+    }
+
+    // Invocation of `original`.
+    _buffer.writeln('var \$ret = original');
+
+    // Type args
+    if (typeParams != null) {
+      _buffer.write('<');
+      var isFirst = true;
+      for (var typeParam in typeParams.typeParameters) {
+        _buffer.write('${isFirst ? '' : ', '}${typeParam.name.name}');
+        isFirst = false;
+      }
+      _buffer.write('>');
+    }
+
+    // Normal args
+    _buffer.write('(');
+    if (formalParams != null) {
+      for (var param in formalParams.parameters) {
+        var prefix = param.isNamed ? '${param.identifier!.name}: ' : '';
+        _buffer.writeln('$prefix${param.identifier!.name}, ');
+      }
+    }
+    _buffer.writeln(');');
+
+    // Write out the after statements
+    for (var stmt in after) {
+      _buffer.writeln(stmt.code);
+    }
+
+    // Return the original value and close the block.
+    _buffer.writeln('return \$ret;\n}');
   }
 }
 
@@ -450,6 +543,15 @@ class _MacroConstructorDefinitionBuilder implements FunctionDefinitionBuilder {
     _buffer.write('$code');
 
     supportingDeclarations?.forEach(_buffer.writeln);
+  }
+
+  @override
+  void wrapBody(
+      {List<Statement>? before,
+      List<Statement>? after,
+      List<Declaration>? supportingDeclarations}) {
+    // TODO: implement wrapBody
+    throw UnimplementedError();
   }
 }
 

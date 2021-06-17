@@ -96,9 +96,17 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
 
 class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
     implements TypeDefinition {
-  AnalyzerTypeDefinition(TypeDefiningElement element,
+  AnalyzerTypeDefinition._(TypeDefiningElement element,
       {DartType? originalReference})
       : super(element, originalReference: originalReference);
+
+  factory AnalyzerTypeDefinition(TypeDefiningElement element,
+          {DartType? originalReference}) =>
+      element is ClassElement
+          ? AnalyzerClassDefinition(element,
+              originalReference: originalReference)
+          : AnalyzerTypeDefinition._(element,
+              originalReference: originalReference);
 
   @override
   bool isSubtype(TypeDeclaration other) => throw UnimplementedError();
@@ -155,61 +163,50 @@ class AnalyzerClassType extends AnalyzerTypeReference
 
 class AnalyzerClassDeclaration extends AnalyzerTypeDeclaration
     implements ClassDeclaration {
-  AnalyzerClassDeclaration(TypeDefiningElement element,
-      {DartType? originalReference})
+  @override
+  ClassElement get element => super.element as ClassElement;
+
+  AnalyzerClassDeclaration(ClassElement element, {DartType? originalReference})
       : super(element, originalReference: originalReference);
 
   @override
   Iterable<MethodDeclaration> get constructors sync* {
-    var e = element;
-    if (e is ClassElement) {
-      for (var constructor in e.constructors) {
-        if (constructor.isSynthetic) continue;
-        yield AnalyzerConstructorDeclaration(constructor);
-      }
+    for (var constructor in element.constructors) {
+      if (constructor.isSynthetic) continue;
+      yield AnalyzerConstructorDeclaration(constructor);
     }
   }
 
   @override
   Iterable<FieldDeclaration> get fields sync* {
-    var e = element;
-    if (e is ClassElement) {
-      for (var field in e.fields) {
-        if (field.isSynthetic) continue;
-        yield AnalyzerFieldDeclaration(field);
-      }
+    for (var field in element.fields) {
+      if (field.isSynthetic) continue;
+      yield AnalyzerFieldDeclaration(field);
     }
   }
 
   @override
   Iterable<MethodDeclaration> get methods sync* {
-    var e = element;
-    if (e is ClassElement) {
-      for (var method in e.methods) {
-        if (method.isSynthetic) continue;
-        yield AnalyzerMethodDeclaration(method);
-      }
+    for (var method in element.methods) {
+      if (method.isSynthetic) continue;
+      yield AnalyzerMethodDeclaration(method);
     }
   }
 
   @override
-  TypeDeclaration? get superclass {
-    var e = element;
-    if (e is ClassElement && !e.isDartCoreObject) {
-      var superType = e.supertype!;
-      return AnalyzerTypeDeclaration(superType.element,
+  ClassDeclaration? get superclass {
+    if (!element.isDartCoreObject) {
+      var superType = element.supertype!;
+      return AnalyzerClassDeclaration(superType.element,
           originalReference: superType);
     }
   }
 
   @override
   Iterable<TypeDeclaration> get superinterfaces sync* {
-    var e = element;
-    if (e is ClassElement) {
-      for (var interface in e.allSupertypes) {
-        yield AnalyzerTypeDeclaration(interface.element,
-            originalReference: interface);
-      }
+    for (var interface in element.allSupertypes) {
+      yield AnalyzerTypeDeclaration(interface.element,
+          originalReference: interface);
     }
   }
 }
@@ -218,7 +215,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
     implements ClassDefinition {
   AnalyzerClassDefinition(TypeDefiningElement element,
       {DartType? originalReference})
-      : super(element, originalReference: originalReference);
+      : super._(element, originalReference: originalReference);
 
   @override
   Iterable<MethodDefinition> get constructors sync* {
@@ -254,7 +251,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   }
 
   @override
-  TypeDefinition? get superclass {
+  ClassDefinition? get superclass {
     var e = element;
     if (e is ClassElement && !e.isDartCoreObject) {
       var superType = e.supertype!;
@@ -361,8 +358,10 @@ abstract class _AnalyzerFunctionDefinition implements FunctionDefinition {
   }
 
   @override
-  TypeDefinition get returnType =>
-      AnalyzerTypeDefinition(element.returnType.element! as TypeDefiningElement,
+  TypeDefinition get returnType => element.returnType.element == null
+      ? const VoidTypeDefinition()
+      : AnalyzerTypeDefinition(
+          element.returnType.element! as TypeDefiningElement,
           originalReference: element.returnType);
 
   @override
@@ -569,4 +568,40 @@ class AnalyzerTypeParameterDefinition extends AnalyzerTypeParameterDeclaration
       ? null
       : AnalyzerTypeDefinition(element.bound!.element! as TypeDefiningElement,
           originalReference: element.bound);
+}
+
+class VoidTypeDeclaration implements TypeDeclaration {
+  const VoidTypeDeclaration();
+
+  @override
+  bool get isAbstract => false;
+
+  @override
+  bool get isExternal => false;
+
+  @override
+  bool get isNullable => false;
+
+  @override
+  bool isSubtype(TypeDeclaration other) => false;
+
+  @override
+  String get name => 'void';
+
+  @override
+  Code get reference => Reference('void');
+
+  @override
+  // TODO: implement scope
+  Scope get scope => throw UnimplementedError();
+
+  @override
+  Iterable<TypeDefinition> get typeArguments => const [];
+
+  @override
+  Iterable<TypeParameterDefinition> get typeParameters => const [];
+}
+
+class VoidTypeDefinition extends VoidTypeDeclaration implements TypeDefinition {
+  const VoidTypeDefinition() : super();
 }

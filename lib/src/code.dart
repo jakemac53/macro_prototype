@@ -26,6 +26,22 @@ class Fragment extends Code {
   Fragment(this.code);
 }
 
+class Block extends Code {
+  final String code;
+
+  Block._(this.code);
+
+  factory Block(String content) {
+    // TODO: parse blocks, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return Block._(content);
+  }
+
+  /// Creates a [Block] from [parts], which must be [Code] objects or
+  /// [String]s.
+  factory Block.fromParts(List<Object> parts) => Block(_combineParts(parts));
+}
+
 /// A piece of code identifying a syntactically valid Declaration.
 class Declaration extends Code {
   final String code;
@@ -82,6 +98,24 @@ class FunctionBody extends Code {
   /// [String]s.
   factory FunctionBody.fromParts(List<Object> parts) =>
       FunctionBody(_combineParts(parts));
+}
+
+/// A piece of code identifying a reference to an identifier.
+class Reference extends Code {
+  final String code;
+
+  Reference._(this.code);
+
+  factory Reference(String content) {
+    // TODO: parse references, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return Reference._(content);
+  }
+
+  /// Creates a [Reference] from [parts], which must be [Code] objects or
+  /// [String]s.
+  factory Reference.fromParts(List<Object> parts) =>
+      Reference(_combineParts(parts));
 }
 
 class Statement extends Code {

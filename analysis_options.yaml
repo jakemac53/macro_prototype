@@ -1,9 +1,12 @@
-import: "package:pedantic/analysis_options.yaml"
+include: package:lints/recommended.yaml
 
 analyzer:
   strong-mode:
     implicit-casts: false
-
+  exclude:
+    - '**/*.gen.dart'
+    - '**/*.types.dart'
+    - '**/*.declarations.dart'
 linter:
   rules:
     - unawaited_futures
