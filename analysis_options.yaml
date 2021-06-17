@@ -11,3 +11,5 @@ linter:
   rules:
     unawaited_futures: true
     implementation_imports: false
+    unnecessary_brace_in_string_interps: false
+    unnecessary_this: false

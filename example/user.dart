@@ -19,6 +19,7 @@ class User {
   ) : name = json["name"] as String;
 
   User({required this.name});
+  @override
   int get hashCode => name.hashCode;
 }
 
@@ -50,6 +51,7 @@ class Group {
         ];
 
   Group({required this.name, required this.users});
+  @override
   int get hashCode => name.hashCode ^ users.hashCode;
 }
 

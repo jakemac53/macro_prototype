@@ -115,7 +115,9 @@ class _HashCode implements ClassDeclarationMacro {
   @override
   void visitClassDeclaration(
       ClassDeclaration declaration, ClassDeclarationBuilder builder) {
-    Code code = Fragment('int get hashCode =>');
+    Code code = Fragment('''
+@override
+int get hashCode =>''');
     var isFirst = true;
     for (var field in declaration.allFields) {
       code = Fragment('$code ${isFirst ? '' : '^ '}${field.name}.hashCode');

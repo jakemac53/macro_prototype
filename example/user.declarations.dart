@@ -17,6 +17,7 @@ class User {
       User(
         name: name ?? this.name,
       );
+  @override
   int get hashCode => name.hashCode;
   @override
   bool operator ==(Object other) => other is User && this.name == other.name;
@@ -44,6 +45,7 @@ class Group {
         name: name ?? this.name,
         users: users ?? this.users,
       );
+  @override
   int get hashCode => name.hashCode ^ users.hashCode;
   @override
   bool operator ==(Object other) =>
