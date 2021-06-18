@@ -1,16 +1,26 @@
 import 'code.dart';
 
+/// Type annotation introspection information for [TypeMacro]s.
 abstract class TypeReference {
+  /// The name of the type as it exists in the type annotation.
   String get name;
 
+  /// Whether or not the type reference is explicitly nullable (contains a
+  /// trailing `?`)
   bool get isNullable;
 
-  // The scope where the type reference should be resolved from.
+  /// The scope in which the type reference appeared in the program.
   Scope get scope;
 
+  /// Emits a piece of code that concretely refers to the same type that is
+  /// referred to by [this], regardless of where in the program it is placed.
+  ///
+  /// Effectively, this type reference has a custom scope (equal to [scope])
+  /// instead of the standard lexical scope.
   Code get reference;
 }
 
+/// Declaration introspection information for [TypeMacro]s.
 abstract class DeclarationType {
   bool get isAbstract;
 
@@ -19,12 +29,14 @@ abstract class DeclarationType {
   String get name;
 }
 
+/// Class introspection information for [TypeMacro]s.
 abstract class ClassType implements TypeReference, DeclarationType {
   TypeReference? get superclass;
 
   Iterable<TypeReference> get superinterfaces;
 }
 
+/// Function introspection information for [TypeMacro]s.
 abstract class FunctionType implements DeclarationType {
   bool get isGetter;
 
@@ -39,14 +51,17 @@ abstract class FunctionType implements DeclarationType {
   Iterable<TypeParameterType> get typeParameters;
 }
 
+/// Method introspection information for [TypeMacro]s.
 abstract class MethodType implements FunctionType {
   TypeReference get definingClass;
 }
 
+/// Field introspection information for [TypeMacro]s.
 abstract class FieldType implements DeclarationType {
   TypeReference get type;
 }
 
+/// Parameter introspection information for [TypeMacro]s.
 abstract class ParameterType {
   String get name;
 
@@ -55,12 +70,9 @@ abstract class ParameterType {
   bool get required;
 }
 
+/// Type parameter introspection information for [TypeMacro]s.
 abstract class TypeParameterType {
   TypeReference? get bounds;
 
   String get name;
-}
-
-abstract class TypeBuilder {
-  void addTypeToLibary(Code declaration);
 }

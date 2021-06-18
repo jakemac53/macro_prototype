@@ -1,6 +1,7 @@
-import 'code.dart';
+import 'macro.dart';
 import 'types.dart';
 
+/// Type annotation introspection information for [DeclarationMacro]s.
 abstract class TypeDeclaration implements TypeReference, DeclarationType {
   Iterable<TypeDeclaration> get typeArguments;
 
@@ -9,6 +10,7 @@ abstract class TypeDeclaration implements TypeReference, DeclarationType {
   bool isSubtype(TypeDeclaration other);
 }
 
+/// Class introspection information for [DeclarationMacro]s.
 abstract class ClassDeclaration implements TypeDeclaration, ClassType {
   Iterable<MethodDeclaration> get constructors;
 
@@ -23,6 +25,7 @@ abstract class ClassDeclaration implements TypeDeclaration, ClassType {
   Iterable<TypeDeclaration> get superinterfaces;
 }
 
+/// Function introspection information for [DeclarationMacro]s.
 abstract class FunctionDeclaration implements FunctionType {
   @override
   TypeDeclaration get returnType;
@@ -37,8 +40,10 @@ abstract class FunctionDeclaration implements FunctionType {
   Iterable<TypeParameterDeclaration> get typeParameters;
 }
 
+/// Method introspection information for [DeclarationMacro]s.
 abstract class MethodDeclaration implements FunctionDeclaration, MethodType {}
 
+/// Field introspection information for [DeclarationMacro]s.
 abstract class FieldDeclaration implements FieldType {
   @override
   String get name;
@@ -47,23 +52,14 @@ abstract class FieldDeclaration implements FieldType {
   TypeDeclaration get type;
 }
 
+/// Parameter introspection information for [DeclarationMacro]s.
 abstract class ParameterDeclaration implements ParameterType {
   @override
   TypeDeclaration get type;
 }
 
+/// TypeParameter introspection information for [DeclarationMacro]s.
 abstract class TypeParameterDeclaration implements TypeParameterType {
   @override
   TypeDeclaration? get bounds;
-}
-
-abstract class DeclarationBuilder {
-  void addToLibrary(Code declaration);
-}
-
-abstract class ClassDeclarationBuilder implements DeclarationBuilder {
-  // TODO: If we want library level macros that can have a declaration phase
-  // that adds stuff to classes, then this should take a parameter to identify
-  // which class [declaration] should be added to.
-  void addToClass(Declaration declaration);
 }
