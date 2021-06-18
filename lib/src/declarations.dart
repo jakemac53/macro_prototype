@@ -43,11 +43,12 @@ abstract class FunctionDeclaration implements FunctionType {
 /// Method introspection information for [DeclarationMacro]s.
 abstract class MethodDeclaration implements FunctionDeclaration, MethodType {}
 
+/// Constructor introspection information for [DeclarationMacro]s.
+abstract class ConstructorDeclaration
+    implements ConstructorType, MethodDeclaration {}
+
 /// Field introspection information for [DeclarationMacro]s.
 abstract class FieldDeclaration implements FieldType {
-  @override
-  String get name;
-
   @override
   TypeDeclaration get type;
 }

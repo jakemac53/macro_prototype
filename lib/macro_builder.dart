@@ -285,8 +285,7 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         buffer.writeln(fieldBuffer);
         return [element.name];
       }
-    } else if ((element is analyzer.MethodElement ||
-            element is analyzer.ConstructorElement) &&
+    } else if (element is analyzer.MethodElement &&
         macro is MethodDefinitionMacro) {
       var methodBuffer = StringBuffer();
       FunctionDefinitionBuilder builder;
@@ -295,26 +294,38 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
           element.enclosingElement as analyzer.ClassElement);
       var node = (await resolver.astNodeFor(element, resolve: true))
           as analyzer.Declaration;
-      if (element is analyzer.MethodElement) {
-        definition = AnalyzerMethodDefinition(element,
-            parentClass: element.enclosingElement as analyzer.ClassElement);
-        builder = _MacroFunctionDefinitionBuilder(
-            methodBuffer, definition, parent, node, originalSource);
-      } else if (element is analyzer.ConstructorElement) {
-        definition = AnalyzerMethodDefinition(element,
-            parentClass: element.enclosingElement);
-        builder = _MacroConstructorDefinitionBuilder(
-            methodBuffer, definition, parent);
-      } else {
-        throw StateError('unreachable');
-      }
+      definition = AnalyzerMethodDefinition(element,
+          parentClass: element.enclosingElement as analyzer.ClassElement);
+      builder = _MacroFunctionDefinitionBuilder(
+          methodBuffer, definition, parent, node, originalSource);
       macro.visitMethodDefinition(definition, builder);
       if (methodBuffer.isNotEmpty) {
         for (var meta in node.metadata) {
           buffer.writeln(meta.toSource());
         }
         buffer.writeln(methodBuffer);
-        return [(element as analyzer.ExecutableElement).name];
+        return [element.name];
+      }
+    } else if (element is analyzer.ConstructorElement &&
+        macro is ConstructorDefinitionMacro) {
+      var methodBuffer = StringBuffer();
+      ConstructorDefinitionBuilder builder;
+      ConstructorDefinition definition;
+      var parent = AnalyzerClassDefinition(element.enclosingElement);
+      var node = (await resolver.astNodeFor(element, resolve: true))
+          as analyzer.ConstructorDeclaration;
+      definition = AnalyzerConstructorDefinition(element,
+          parentClass: element.enclosingElement);
+      builder = _MacroConstructorDefinitionBuilder(
+          methodBuffer, definition, parent, node, originalSource);
+
+      macro.visitConstructorDefinition(definition, builder);
+      if (methodBuffer.isNotEmpty) {
+        for (var meta in node.metadata) {
+          buffer.writeln(meta.toSource());
+        }
+        buffer.writeln(methodBuffer);
+        return [element.name];
       }
     } else if (element is analyzer.FunctionElement &&
         macro is FunctionDefinitionMacro) {
@@ -434,6 +445,96 @@ ${_definition.type.toCode()} ${_definition.name} = $body;''');
   }
 }
 
+class _MacroConstructorDefinitionBuilder
+    implements ConstructorDefinitionBuilder {
+  final StringBuffer _buffer;
+  final FunctionDefinition _definition;
+  final ClassDefinition definingClass;
+  final analyzer.ConstructorDeclaration _node;
+  final String _originalSource;
+
+  _MacroConstructorDefinitionBuilder(this._buffer, this._definition,
+      this.definingClass, this._node, this._originalSource);
+
+  @override
+  void implement({FunctionBody? body, List<Code>? initializers}) {
+    _buffer.writeln('${definingClass.name}.${_definition.name}(');
+    for (var positional in _definition.positionalParameters) {
+      _buffer.writeln('${positional.type.toCode()} ${positional.name},');
+    }
+    if (_definition.namedParameters.isNotEmpty) {
+      _buffer.write(' {');
+      for (var named in _definition.namedParameters.values) {
+        _buffer.writeln(
+            '${named.required ? 'required ' : ''}${named.type.toCode()} ${named.name},');
+      }
+      _buffer.writeln('}');
+    }
+    _buffer.write(')');
+    if (initializers != null) {
+      _buffer.write(' : ');
+      for (var initializer in initializers) {
+        _buffer.writeln(
+            '${initializer.code}${initializer == initializers.last ? '' : ','}');
+      }
+    }
+    if (body != null) {
+      _buffer.write(body.code);
+    } else {
+      _buffer.write(';');
+    }
+  }
+
+  @override
+  void wrapBody({List<Statement>? before, List<Statement>? after}) {
+    before ??= const [];
+    after ??= const [];
+    var node = _node;
+    var body = node.body;
+    var formalParams = node.parameters;
+    if (body is! analyzer.BlockFunctionBody) {
+      throw UnsupportedError(
+          'Only block function bodies can be wrapped but got $body.');
+    }
+
+    // Write everything up to the first open curly bracket
+    _buffer.write(_originalSource.substring(
+        node.firstTokenAfterCommentAndMetadata.offset,
+        body.block.leftBracket.offset + 1));
+
+    // Write out the local function which is identical to the original
+    _buffer.write(
+        // Alert! Hack incoming :D
+        '\$original' +
+            _originalSource.substring(
+                formalParams.leftParenthesis.offset, node.end + 1));
+
+    // Write out the before statements
+    for (var stmt in before) {
+      _buffer.writeln(stmt.code);
+    }
+
+    // Invocation of `original`.
+    _buffer.writeln('var \$ret = \$original');
+
+    // Normal args
+    _buffer.write('(');
+    for (var param in formalParams.parameters) {
+      var prefix = param.isNamed ? '${param.identifier!.name}: ' : '';
+      _buffer.writeln('$prefix${param.identifier!.name}, ');
+    }
+    _buffer.writeln(');');
+
+    // Write out the after statements
+    for (var stmt in after) {
+      _buffer.writeln(stmt.code);
+    }
+
+    // Return the original value and close the block.
+    _buffer.writeln('return \$ret;\n}');
+  }
+}
+
 class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
   final StringBuffer _buffer;
   final FunctionDefinition _definition;
@@ -539,44 +640,6 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
 
     // Return the original value and close the block.
     _buffer.writeln('return \$ret;\n}');
-  }
-}
-
-class _MacroConstructorDefinitionBuilder implements FunctionDefinitionBuilder {
-  final StringBuffer _buffer;
-  final MethodDefinition _definition;
-  final ClassDefinition definingClass;
-
-  _MacroConstructorDefinitionBuilder(
-      this._buffer, this._definition, this.definingClass);
-
-  @override
-  void implement(Code code, {List<Code>? supportingDeclarations}) {
-    _buffer.writeln('${definingClass.name}.${_definition.name}(');
-    for (var positional in _definition.positionalParameters) {
-      _buffer.writeln('${positional.type.toCode()} ${positional.name},');
-    }
-    if (_definition.namedParameters.isNotEmpty) {
-      _buffer.write(' {');
-      for (var named in _definition.namedParameters.values) {
-        _buffer.writeln(
-            '${named.required ? 'required ' : ''}${named.type.toCode()} ${named.name},');
-      }
-      _buffer.writeln('}');
-    }
-    _buffer.write(')');
-    _buffer.write('$code');
-
-    supportingDeclarations?.forEach(_buffer.writeln);
-  }
-
-  @override
-  void wrapBody(
-      {List<Statement>? before,
-      List<Statement>? after,
-      List<Declaration>? supportingDeclarations}) {
-    // TODO: implement wrapBody
-    throw UnimplementedError();
   }
 }
 

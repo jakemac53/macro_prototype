@@ -30,9 +30,6 @@ abstract class ClassDefinition implements TypeDefinition, ClassDeclaration {
 /// Function introspection information for [DefinitionMacro]s.
 abstract class FunctionDefinition implements FunctionDeclaration {
   @override
-  String get name;
-
-  @override
   TypeDefinition get returnType;
 
   @override
@@ -52,12 +49,13 @@ abstract class MethodDefinition
   ClassDefinition get definingClass;
 }
 
+/// Constructor introspection information for [DefinitionMacro]s.
+abstract class ConstructorDefinition
+    implements ConstructorDeclaration, MethodDefinition {}
+
 /// Field introspection information for [DefinitionMacro]s.
 abstract class FieldDefinition implements FieldDeclaration {
   ClassDefinition? get definingClass;
-
-  @override
-  String get name;
 
   @override
   TypeDefinition get type;

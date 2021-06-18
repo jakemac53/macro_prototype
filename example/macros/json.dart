@@ -2,7 +2,11 @@ import 'package:macro_builder/macro_builder.dart';
 
 const jsonSerializable = _JsonMacro();
 
-class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
+class _JsonMacro
+    implements
+        ClassDeclarationMacro,
+        MethodDefinitionMacro,
+        ConstructorDefinitionMacro {
   const _JsonMacro();
 
   @override
@@ -16,28 +20,26 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
   }
 
   @override
+  void visitConstructorDefinition(
+      ConstructorDefinition definition, ConstructorDefinitionBuilder builder) {
+    _defineFromJson(definition, builder);
+  }
+
+  @override
   void visitMethodDefinition(
       MethodDefinition definition, FunctionDefinitionBuilder builder) {
-    switch (definition.name) {
-      case 'fromJson':
-        _defineFromJson(definition, builder);
-        break;
-      case 'toJson':
-        _defineToJson(definition, builder);
-        break;
-    }
+    _defineToJson(definition, builder);
   }
 
   void _defineFromJson(
-      MethodDefinition fromJson, FunctionDefinitionBuilder builder) {
-    Code code = Fragment(' : ');
+      ConstructorDefinition fromJson, ConstructorDefinitionBuilder builder) {
     var clazz = fromJson.definingClass;
     var fields = clazz.fields.toList();
-    for (var field in fields) {
-      code = Fragment(
-          '$code\n ${field.name} = ${_typeFromJson(field.type, Fragment('json["${field.name}"]'))}'
-          '${field != fields.last ? ',' : ''}');
-    }
+    var initializers = <Code>[
+      for (var field in fields)
+        Fragment('${field.name} = '
+            '${_typeFromJson(field.type, Fragment('json["${field.name}"]'))}'),
+    ];
     // Need to call super constructors, we require they have a fromJson
     // constructor identical to one we would create, to simplify things.
     var superclass = clazz.superclass;
@@ -46,11 +48,10 @@ class _JsonMacro implements ClassDeclarationMacro, MethodDefinitionMacro {
         throw UnsupportedError(
             '@jsonSerializable only works if applied to all superclasses.');
       }
-      code = Fragment('$code,\nsuper.fromJson(json)');
+      initializers.add(Fragment('super.fromJson(json)'));
     }
 
-    code = Fragment('$code;');
-    builder.implement(code);
+    builder.implement(initializers: initializers);
   }
 
   void _defineToJson(

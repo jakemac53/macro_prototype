@@ -56,6 +56,11 @@ abstract class MethodType implements FunctionType {
   TypeReference get definingClass;
 }
 
+/// Constructor introspection information for [TypeMacro]s.
+abstract class ConstructorType implements MethodType {
+  bool get isFactory;
+}
+
 /// Field introspection information for [TypeMacro]s.
 abstract class FieldType implements DeclarationType {
   TypeReference get type;

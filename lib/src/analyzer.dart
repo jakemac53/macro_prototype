@@ -396,7 +396,7 @@ class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
   ClassDefinition get definingClass => AnalyzerClassDefinition(parentClass);
 }
 
-class AnalyzerConstructorDeclaration implements MethodDeclaration {
+class AnalyzerConstructorDeclaration implements ConstructorDeclaration {
   final analyzer.ConstructorElement element;
 
   AnalyzerConstructorDeclaration(this.element);
@@ -410,6 +410,9 @@ class AnalyzerConstructorDeclaration implements MethodDeclaration {
 
   @override
   bool get isExternal => element.isExternal;
+
+  @override
+  bool get isFactory => element.isFactory;
 
   @override
   bool get isGetter => false;
@@ -448,7 +451,7 @@ class AnalyzerConstructorDeclaration implements MethodDeclaration {
 }
 
 class AnalyzerConstructorDefinition extends AnalyzerConstructorDeclaration
-    implements MethodDefinition {
+    implements ConstructorDefinition {
   final analyzer.ClassElement _parentClass;
 
   AnalyzerConstructorDefinition(analyzer.ConstructorElement element,
