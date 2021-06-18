@@ -72,8 +72,7 @@ class _AutoConstructor implements ClassDeclarationMacro {
       }
       code = Fragment('$code)');
     }
-    code = Declaration('$code;');
-    builder.addToClass(code);
+    builder.addToClass(Declaration('$code;'));
   }
 }
 
@@ -90,20 +89,25 @@ class _CopyWith implements ClassDeclarationMacro {
       throw ArgumentError(
           'Cannot generate a copyWith method because one already exists');
     }
-    Code code = Fragment('${declaration.reference} copyWith({');
-    for (var field in declaration.allFields) {
-      code = Fragment(
-          '$code${field.type.toCode()}${field.type.isNullable ? '' : '?'} '
-          '${field.name}, ');
-    }
-    // TODO: We assume this constructor exists, but should check
-    code = Fragment('$code}) => ${declaration.reference}(');
-    for (var field in declaration.allFields) {
-      code =
-          Fragment('$code${field.name}: ${field.name}?? this.${field.name}, ');
-    }
-    code = Declaration('$code);');
-    builder.addToClass(code);
+    var namedParams = <Parameter>[
+      for (var field in declaration.allFields)
+        Parameter('${field.type.toCode()}${field.type.isNullable ? '' : '?'} '
+            '${field.name}'),
+    ];
+    var args = <NamedArgument>[
+      for (var field in declaration.allFields)
+        NamedArgument('${field.name}: ${field.name}?? this.${field.name}'),
+    ];
+    builder.addToClass(Declaration.fromParts([
+      declaration.reference,
+      Fragment(' copyWith({'),
+      namedParams,
+      Fragment('})'),
+      // TODO: We assume this constructor exists, but should check
+      Fragment('=> ${declaration.reference}('),
+      args,
+      Fragment(');'),
+    ]));
   }
 }
 
@@ -123,8 +127,7 @@ int get hashCode =>''');
       code = Fragment('$code ${isFirst ? '' : '^ '}${field.name}.hashCode');
       isFirst = false;
     }
-    code = Declaration('$code;');
-    builder.addToClass(code);
+    builder.addToClass(Declaration('$code;'));
   }
 }
 
@@ -142,8 +145,7 @@ bool operator==(Object other) => other is ${declaration.reference}''');
     for (var field in declaration.allFields) {
       code = Fragment('$code && this.${field.name} == other.${field.name}');
     }
-    code = Declaration('$code;');
-    builder.addToClass(code);
+    builder.addToClass(Declaration('$code;'));
   }
 }
 
@@ -164,8 +166,7 @@ String toString() => '\${${declaration.name}} {''');
           '$code${isFirst ? '' : ', '}${field.name}: \${${field.name}}');
       isFirst = false;
     }
-    code = Declaration('$code}\';');
-    builder.addToClass(code);
+    builder.addToClass(Declaration('$code}\';'));
   }
 }
 

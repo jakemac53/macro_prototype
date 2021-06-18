@@ -65,5 +65,5 @@ abstract class ClassDeclarationBuilder implements DeclarationBuilder {
   // TODO: If we want library level macros that can have a declaration phase
   // that adds stuff to classes, then this should take a parameter to identify
   // which class [declaration] should be added to.
-  void addToClass(Code declaration);
+  void addToClass(Declaration declaration);
 }

@@ -11,12 +11,7 @@ class User {
   User({
     required this.name,
   });
-  User copyWith({
-    String? name,
-  }) =>
-      User(
-        name: name ?? this.name,
-      );
+  User copyWith({String? name}) => User(name: name ?? this.name);
   @override
   int get hashCode => name.hashCode;
   @override
@@ -37,14 +32,8 @@ class Group {
     required this.name,
     required this.users,
   });
-  Group copyWith({
-    String? name,
-    List<User>? users,
-  }) =>
-      Group(
-        name: name ?? this.name,
-        users: users ?? this.users,
-      );
+  Group copyWith({String? name, List<User>? users}) =>
+      Group(name: name ?? this.name, users: users ?? this.users);
   @override
   int get hashCode => name.hashCode ^ users.hashCode;
   @override

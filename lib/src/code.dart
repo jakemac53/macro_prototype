@@ -130,6 +130,58 @@ class FunctionBody extends Code {
       FunctionBody(_combineParts(parts));
 }
 
+/// A piece of code identifying a named argument.
+///
+/// This should not include any trailing commas.
+class NamedArgument extends Code {
+  @override
+  final String code;
+
+  NamedArgument._(this.code);
+
+  factory NamedArgument(String content) {
+    // TODO: parse declarations, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return NamedArgument._(content);
+  }
+
+  /// Creates a [Parameter] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
+  factory NamedArgument.fromParts(List<Object> parts) =>
+      NamedArgument(_combineParts(parts));
+}
+
+/// A piece of code identifying a syntactically valid function parameter.
+///
+/// This should not include any trailing commas, but may include modifiers
+/// such as `required`, and default values.
+///
+/// There is no distinction here made between named and positional params,
+/// nore between optional or required params. It is the job of the user to
+/// construct and combine these together in a way that creates valid parameter
+/// lists.
+class Parameter extends Code {
+  @override
+  final String code;
+
+  Parameter._(this.code);
+
+  factory Parameter(String content) {
+    // TODO: parse declarations, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return Parameter._(content);
+  }
+
+  /// Creates a [Parameter] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
+  factory Parameter.fromParts(List<Object> parts) =>
+      Parameter(_combineParts(parts));
+}
+
 /// A piece of code representing a syntactically valid statement.
 class Statement extends Code {
   ast.Statement _statement;
@@ -176,35 +228,6 @@ class TypeAnnotation extends Code {
   /// When a [List<Code>] is encountered they are joined by a comma.
   factory TypeAnnotation.fromParts(List<Object> parts) =>
       TypeAnnotation(_combineParts(parts));
-}
-
-/// A piece of code identifying a syntactically valid function parameter.
-///
-/// This should not include any trailing commas, but may include modifiers
-/// such as `required`, and default values.
-///
-/// There is no distinction here made between named and positional params,
-/// nore between optional or required params. It is the job of the user to
-/// construct and combine these together in a way that creates valid parameter
-/// lists.
-class Parameter extends Code {
-  @override
-  final String code;
-
-  Parameter._(this.code);
-
-  factory Parameter(String content) {
-    // TODO: parse declarations, analyzer doesn't provide a nice api for this
-    // that I can find.
-    return Parameter._(content);
-  }
-
-  /// Creates a [Parameter] from [parts], which must be of type [Code]
-  /// [List<Code>] or [String].
-  ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Parameter.fromParts(List<Object> parts) =>
-      Parameter(_combineParts(parts));
 }
 
 final _featureSet = FeatureSet.latestLanguageVersion();
