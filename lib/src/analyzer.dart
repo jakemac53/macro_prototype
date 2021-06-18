@@ -601,7 +601,7 @@ class VoidTypeDeclaration implements TypeDeclaration {
   String get name => 'void';
 
   @override
-  Code get reference => Reference('void');
+  Code get reference => TypeAnnotation('void');
 
   @override
   // TODO: implement scope

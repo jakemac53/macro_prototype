@@ -26,26 +26,16 @@ class Fragment extends Code {
   final String code;
 
   Fragment(this.code);
+
+  /// Creates a [Fragment] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
+  factory Fragment.fromParts(List<Object> parts) =>
+      Fragment(_combineParts(parts));
 }
 
-class Block extends Code {
-  @override
-  final String code;
-
-  Block._(this.code);
-
-  factory Block(String content) {
-    // TODO: parse blocks, analyzer doesn't provide a nice api for this
-    // that I can find.
-    return Block._(content);
-  }
-
-  /// Creates a [Block] from [parts], which must be [Code] objects or
-  /// [String]s.
-  factory Block.fromParts(List<Object> parts) => Block(_combineParts(parts));
-}
-
-/// A piece of code identifying a syntactically valid Declaration.
+/// A piece of code representing a syntactically valid Declaration.
 class Declaration extends Code {
   @override
   final String code;
@@ -58,12 +48,36 @@ class Declaration extends Code {
     return Declaration._(content);
   }
 
-  /// Creates a [Declaration] from [parts], which must be [Code] objects or
-  /// [String]s.
+  /// Creates a [Declaration] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
   factory Declaration.fromParts(List<Object> parts) =>
       Declaration(_combineParts(parts));
 }
 
+/// A piece of code representing a syntactically valid Element.
+class Element extends Code {
+  @override
+  final String code;
+
+  Element._(this.code);
+
+  factory Element(String content) {
+    // TODO: parse elements, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return Element._(content);
+  }
+
+  /// Creates a [Declaration] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
+  factory Element.fromParts(List<Object> parts) =>
+      Element(_combineParts(parts));
+}
+
+/// A piece of code representing a syntactically valid Expression.
 class Expression extends Code {
   ast.Expression _expression;
 
@@ -78,12 +92,20 @@ class Expression extends Code {
     return Expression._(expr);
   }
 
-  /// Creates an [Expression] from [parts], which must be [Code] objects or
-  /// [String]s.
+  /// Creates an [Expression] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
   factory Expression.fromParts(List<Object> parts) =>
       Expression(_combineParts(parts));
 }
 
+/// A piece of code representing a syntactically valid function body.
+///
+/// This includes any and all code after the parameter list of a function,
+/// including modifiers like `async`.
+///
+/// Both arrow and block function bodies are allowed.
 class FunctionBody extends Code {
   ast.FunctionBody _body;
 
@@ -100,31 +122,15 @@ class FunctionBody extends Code {
     return FunctionBody._(body);
   }
 
-  /// Creates an [Expression] from [parts], which must be [Code] objects or
-  /// [String]s.
+  /// Creates an [Expression] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
   factory FunctionBody.fromParts(List<Object> parts) =>
       FunctionBody(_combineParts(parts));
 }
 
-/// A piece of code identifying a reference to an identifier.
-class Reference extends Code {
-  @override
-  final String code;
-
-  Reference._(this.code);
-
-  factory Reference(String content) {
-    // TODO: parse references, analyzer doesn't provide a nice api for this
-    // that I can find.
-    return Reference._(content);
-  }
-
-  /// Creates a [Reference] from [parts], which must be [Code] objects or
-  /// [String]s.
-  factory Reference.fromParts(List<Object> parts) =>
-      Reference(_combineParts(parts));
-}
-
+/// A piece of code representing a syntactically valid statement.
 class Statement extends Code {
   ast.Statement _statement;
 
@@ -139,10 +145,66 @@ class Statement extends Code {
     return Statement._(stmt);
   }
 
-  /// Creates a [Statement] from [parts], which must be [Code] objects or
-  /// [String]s.
+  /// Creates a [Statement] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
   factory Statement.fromParts(List<Object> parts) =>
       Statement(_combineParts(parts));
+}
+
+/// A piece of code representing a syntactically valid type annotation.
+class TypeAnnotation extends Code {
+  ast.TypeAnnotation _typeAnnotation;
+
+  @override
+  String get code => _typeAnnotation.toSource();
+
+  TypeAnnotation._(this._typeAnnotation);
+
+  factory TypeAnnotation(String content) {
+    var typeAnnotation = _withParserAndToken(
+        content,
+        // TODO: exact implications of passing `false` here?
+        (parser, token) => parser.parseTypeAnnotation(false));
+    return TypeAnnotation._(typeAnnotation);
+  }
+
+  /// Creates a [TypeAnnotation] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
+  factory TypeAnnotation.fromParts(List<Object> parts) =>
+      TypeAnnotation(_combineParts(parts));
+}
+
+/// A piece of code identifying a syntactically valid function parameter.
+///
+/// This should not include any trailing commas, but may include modifiers
+/// such as `required`, and default values.
+///
+/// There is no distinction here made between named and positional params,
+/// nore between optional or required params. It is the job of the user to
+/// construct and combine these together in a way that creates valid parameter
+/// lists.
+class Parameter extends Code {
+  @override
+  final String code;
+
+  Parameter._(this.code);
+
+  factory Parameter(String content) {
+    // TODO: parse declarations, analyzer doesn't provide a nice api for this
+    // that I can find.
+    return Parameter._(content);
+  }
+
+  /// Creates a [Parameter] from [parts], which must be of type [Code]
+  /// [List<Code>] or [String].
+  ///
+  /// When a [List<Code>] is encountered they are joined by a comma.
+  factory Parameter.fromParts(List<Object> parts) =>
+      Parameter(_combineParts(parts));
 }
 
 final _featureSet = FeatureSet.latestLanguageVersion();
@@ -176,9 +238,11 @@ String _combineParts(List<Object> parts) {
       buffer.write(part);
     } else if (part is Code) {
       buffer.write(part.code);
+    } else if (part is List<Code>) {
+      buffer.write(part.map((p) => p.code).join(', '));
     } else {
       throw UnsupportedError(
-          'Only String, Code, and Fragement are allowed but got $part');
+          'Only String, Code, and List<Code> are allowed but got $part');
     }
   }
   return buffer.toString();

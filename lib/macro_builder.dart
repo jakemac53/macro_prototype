@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:analyzer/dart/ast/ast.dart' as ast;
-import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/ast/ast.dart' as analyzer;
+import 'package:analyzer/dart/element/element.dart' as analyzer;
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:source_gen/source_gen.dart';
@@ -75,7 +75,7 @@ abstract class _MacroBuilder extends Builder {
   }
 
   Future<void> _applyMacros(
-    Element element,
+    analyzer.Element element,
     StringBuffer buffer,
     StringBuffer libraryBuffer,
     Resolver resolver,
@@ -86,10 +86,10 @@ abstract class _MacroBuilder extends Builder {
   }) async {
     if (element.isSynthetic) return;
     implementedDecls ??= [];
-    if (element is ClassElement) {
+    if (element is analyzer.ClassElement) {
       var classBuffer = StringBuffer();
       var clazz = (await resolver.astNodeFor(element, resolve: true))
-          as ast.ClassDeclaration;
+          as analyzer.ClassDeclaration;
       var start = clazz.offset;
       var end = clazz.leftBracket.charOffset;
       classBuffer.writeln(originalSource.substring(start, end + 1));
@@ -143,7 +143,7 @@ abstract class _MacroBuilder extends Builder {
 
       if (implementedDecls.contains(element.name!) != true) {
         var node = (await resolver.astNodeFor(element, resolve: true))!;
-        if (element is FieldElement) {
+        if (element is analyzer.FieldElement) {
           node = node.parent!.parent!;
         }
         buffer.writeln(node.toSource());
@@ -159,7 +159,7 @@ abstract class _MacroBuilder extends Builder {
   Future<List<String>?> maybeApplyMacro(
       TypeChecker checker,
       Macro macro,
-      Element element,
+      analyzer.Element element,
       Resolver resolver,
       StringBuffer buffer,
       StringBuffer libraryBuffer,
@@ -177,24 +177,26 @@ class TypesMacroBuilder extends _MacroBuilder {
   Future<List<String>?> maybeApplyMacro(
       TypeChecker checker,
       Macro macro,
-      Element element,
+      analyzer.Element element,
       Resolver resolver,
       StringBuffer buffer,
       StringBuffer libraryBuffer,
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
-    if (macro is ClassTypeMacro && element is ClassElement) {
+    if (macro is ClassTypeMacro && element is analyzer.ClassElement) {
       macro.visitClassType(
           AnalyzerClassType(element), _MacroTypeBuilder(libraryBuffer));
-    } else if (element is FieldElement && macro is FieldTypeMacro) {
+    } else if (element is analyzer.FieldElement && macro is FieldTypeMacro) {
       throw UnimplementedError(
           'FieldTypeMacro is not implemented in this prototype');
-    } else if ((element is MethodElement || element is ConstructorElement) &&
+    } else if ((element is analyzer.MethodElement ||
+            element is analyzer.ConstructorElement) &&
         macro is MethodTypeMacro) {
       throw UnimplementedError(
           'MethodTypeMacro is not implemented in this prototype');
-    } else if (element is FunctionElement && macro is FunctionTypeMacro) {
+    } else if (element is analyzer.FunctionElement &&
+        macro is FunctionTypeMacro) {
       throw UnimplementedError(
           'FunctionTypeMacro is not implemented in this prototype');
     }
@@ -212,32 +214,34 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
   Future<List<String>?> maybeApplyMacro(
       TypeChecker checker,
       Macro macro,
-      Element element,
+      analyzer.Element element,
       Resolver resolver,
       StringBuffer buffer,
       StringBuffer libraryBuffer,
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
-    if (element is ClassElement && macro is ClassDeclarationMacro) {
+    if (element is analyzer.ClassElement && macro is ClassDeclarationMacro) {
       macro.visitClassDeclaration(
           AnalyzerClassDeclaration(element),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
 
       // TODO: return list of names of declarations modified
-    } else if (element is FieldElement && macro is FieldDeclarationMacro) {
+    } else if (element is analyzer.FieldElement &&
+        macro is FieldDeclarationMacro) {
       macro.visitFieldDeclaration(
           AnalyzerFieldDeclaration(element),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
-    } else if ((element is MethodElement || element is ConstructorElement) &&
+    } else if ((element is analyzer.MethodElement ||
+            element is analyzer.ConstructorElement) &&
         macro is MethodDeclarationMacro) {
       macro.visitMethodDeclaration(
-          AnalyzerMethodDeclaration(element as ExecutableElement),
+          AnalyzerMethodDeclaration(element as analyzer.ExecutableElement),
           _MacroClassDeclarationBuilder(
               classBuffer: buffer, libraryBuffer: libraryBuffer));
-    } else if (element is FunctionElement &&
+    } else if (element is analyzer.FunctionElement &&
         macro is FunctionDeclarationMacro) {
       macro.visitFunctionDeclaration(AnalyzerMethodDeclaration(element),
           _MacroLibraryDeclarationBuilder(libraryBuffer: libraryBuffer));
@@ -256,46 +260,47 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
   Future<List<String>?> maybeApplyMacro(
       TypeChecker checker,
       Macro macro,
-      Element element,
+      analyzer.Element element,
       Resolver resolver,
       StringBuffer buffer,
       StringBuffer libraryBuffer,
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
-    if (element is FieldElement && macro is FieldDefinitionMacro) {
+    if (element is analyzer.FieldElement && macro is FieldDefinitionMacro) {
       var fieldBuffer = StringBuffer();
       var definition = AnalyzerFieldDefinition(element,
-          parentClass: element.enclosingElement as ClassElement?);
-      var parent =
-          AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+          parentClass: element.enclosingElement as analyzer.ClassElement?);
+      var parent = AnalyzerClassDefinition(
+          element.enclosingElement as analyzer.ClassElement);
       macro.visitFieldDefinition(
           definition, _MacroFieldDefinitionBuilder(buffer, definition, parent));
       if (fieldBuffer.isNotEmpty) {
         var node = (await resolver.astNodeFor(element, resolve: true))!
             .parent!
-            .parent as ast.FieldDeclaration;
+            .parent as analyzer.FieldDeclaration;
         for (var meta in node.metadata) {
           buffer.writeln(meta.toSource());
         }
         buffer.writeln(fieldBuffer);
         return [element.name];
       }
-    } else if ((element is MethodElement || element is ConstructorElement) &&
+    } else if ((element is analyzer.MethodElement ||
+            element is analyzer.ConstructorElement) &&
         macro is MethodDefinitionMacro) {
       var methodBuffer = StringBuffer();
       FunctionDefinitionBuilder builder;
       MethodDefinition definition;
-      var parent =
-          AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+      var parent = AnalyzerClassDefinition(
+          element.enclosingElement as analyzer.ClassElement);
       var node = (await resolver.astNodeFor(element, resolve: true))
-          as ast.Declaration;
-      if (element is MethodElement) {
+          as analyzer.Declaration;
+      if (element is analyzer.MethodElement) {
         definition = AnalyzerMethodDefinition(element,
-            parentClass: element.enclosingElement as ClassElement);
+            parentClass: element.enclosingElement as analyzer.ClassElement);
         builder = _MacroFunctionDefinitionBuilder(
             methodBuffer, definition, parent, node, originalSource);
-      } else if (element is ConstructorElement) {
+      } else if (element is analyzer.ConstructorElement) {
         definition = AnalyzerMethodDefinition(element,
             parentClass: element.enclosingElement);
         builder = _MacroConstructorDefinitionBuilder(
@@ -309,15 +314,16 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
           buffer.writeln(meta.toSource());
         }
         buffer.writeln(methodBuffer);
-        return [(element as ExecutableElement).name];
+        return [(element as analyzer.ExecutableElement).name];
       }
-    } else if (element is FunctionElement && macro is FunctionDefinitionMacro) {
+    } else if (element is analyzer.FunctionElement &&
+        macro is FunctionDefinitionMacro) {
       var fnBuffer = StringBuffer();
       var definition = AnalyzerFunctionDefinition(element);
-      var parent =
-          AnalyzerClassDefinition(element.enclosingElement as ClassElement);
+      var parent = AnalyzerClassDefinition(
+          element.enclosingElement as analyzer.ClassElement);
       var node = (await resolver.astNodeFor(element, resolve: true))
-          as ast.Declaration;
+          as analyzer.Declaration;
       var builder = _MacroFunctionDefinitionBuilder(
           fnBuffer, definition, parent, node, originalSource);
       macro.visitFunctionDefinition(definition, builder);
@@ -334,15 +340,15 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
 
 /// Throws if [element] is annotated with a macro that doesn't support that
 /// type of declaration.
-void _checkValidMacroApplication(Element element, Macro macro) {
-  if (element is ClassElement) {
+void _checkValidMacroApplication(analyzer.Element element, Macro macro) {
+  if (element is analyzer.ClassElement) {
     if (macro is! ClassTypeMacro && macro is! ClassDeclarationMacro) {
       throw ArgumentError(
           'Macro $macro does not support running on classes but was found on '
           '$element');
     }
     // TODO: return list of names of declarations modified
-  } else if (element is FieldElement) {
+  } else if (element is analyzer.FieldElement) {
     if (macro is! FieldTypeMacro &&
         macro is! FieldDeclarationMacro &&
         macro is! FieldDefinitionMacro) {
@@ -350,7 +356,8 @@ void _checkValidMacroApplication(Element element, Macro macro) {
           'Macro $macro does not support running on fields but was found on '
           '$element');
     }
-  } else if (element is MethodElement || element is ConstructorElement) {
+  } else if (element is analyzer.MethodElement ||
+      element is analyzer.ConstructorElement) {
     if (macro is! MethodTypeMacro &&
         macro is! MethodDeclarationMacro &&
         macro is! MethodDefinitionMacro) {
@@ -358,7 +365,7 @@ void _checkValidMacroApplication(Element element, Macro macro) {
           'Macro $macro does not support running on methods or constructors, '
           'but was found on $element');
     }
-  } else if (element is FunctionElement) {
+  } else if (element is analyzer.FunctionElement) {
     if (macro is! FunctionType &&
         macro is! FunctionDeclarationMacro &&
         macro is! FunctionDefinitionMacro) {
@@ -431,7 +438,7 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
   final StringBuffer _buffer;
   final FunctionDefinition _definition;
   final ClassDefinition definingClass;
-  final ast.Declaration _node;
+  final analyzer.Declaration _node;
   final String _originalSource;
 
   _MacroFunctionDefinitionBuilder(this._buffer, this._definition,
@@ -465,14 +472,14 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
     before ??= const [];
     after ??= const [];
     var node = _node;
-    ast.FunctionBody body;
-    ast.TypeParameterList? typeParams;
-    ast.FormalParameterList? formalParams;
-    if (node is ast.MethodDeclaration) {
+    analyzer.FunctionBody body;
+    analyzer.TypeParameterList? typeParams;
+    analyzer.FormalParameterList? formalParams;
+    if (node is analyzer.MethodDeclaration) {
       body = node.body;
       typeParams = node.typeParameters;
       formalParams = node.parameters;
-    } else if (node is ast.FunctionDeclaration) {
+    } else if (node is analyzer.FunctionDeclaration) {
       body = node.functionExpression.body;
       typeParams = node.functionExpression.typeParameters;
       formalParams = node.functionExpression.parameters;
@@ -480,7 +487,7 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
       throw UnsupportedError(
           'Can only wrap normal functions and methods but got $_node');
     }
-    if (body is! ast.BlockFunctionBody) {
+    if (body is! analyzer.BlockFunctionBody) {
       throw UnsupportedError(
           'Only block function bodies can be wrapped but got $body.');
     }
