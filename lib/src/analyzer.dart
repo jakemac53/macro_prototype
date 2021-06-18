@@ -1,6 +1,6 @@
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/nullability_suffix.dart';
-import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/element.dart' as analyzer;
+import 'package:analyzer/dart/element/nullability_suffix.dart' as analyzer;
+import 'package:analyzer/dart/element/type.dart' as analyzer;
 
 import 'code.dart';
 import 'definitions.dart';
@@ -8,14 +8,15 @@ import 'declarations.dart';
 import 'types.dart';
 
 class AnalyzerTypeReference implements TypeReference {
-  final TypeDefiningElement element;
-  final DartType? originalReference;
+  final analyzer.TypeDefiningElement element;
+  final analyzer.DartType? originalReference;
 
   AnalyzerTypeReference(this.element, {this.originalReference});
 
   @override
   bool get isNullable =>
-      originalReference?.nullabilitySuffix == NullabilitySuffix.question;
+      originalReference?.nullabilitySuffix ==
+      analyzer.NullabilitySuffix.question;
 
   @override
   String get name => element.name!;
@@ -29,19 +30,19 @@ class AnalyzerTypeReference implements TypeReference {
 }
 
 abstract class AnalyzerDeclarationType implements DeclarationType {
-  TypeDefiningElement get element;
+  analyzer.TypeDefiningElement get element;
 
   @override
   bool get isAbstract {
     var e = element;
-    if (e is! ClassElement) return false;
+    if (e is! analyzer.ClassElement) return false;
     return e.isAbstract;
   }
 
   @override
   bool get isExternal {
     var e = element;
-    if (e is! ClassElement) return false;
+    if (e is! analyzer.ClassElement) return false;
     throw UnsupportedError(
         'Analyzer doesn\'t appear to have an isExternal getter for classes?');
   }
@@ -49,8 +50,8 @@ abstract class AnalyzerDeclarationType implements DeclarationType {
 
 class AnalyzerTypeDeclaration extends AnalyzerTypeReference
     implements TypeDeclaration {
-  AnalyzerTypeDeclaration(TypeDefiningElement element,
-      {DartType? originalReference})
+  AnalyzerTypeDeclaration(analyzer.TypeDefiningElement element,
+      {analyzer.DartType? originalReference})
       : super(element, originalReference: originalReference);
 
   @override
@@ -59,14 +60,14 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
   @override
   bool get isAbstract {
     var e = element;
-    if (e is! ClassElement) return false;
+    if (e is! analyzer.ClassElement) return false;
     return e.isAbstract;
   }
 
   @override
   bool get isExternal {
     var e = element;
-    if (e is! ClassElement) return false;
+    if (e is! analyzer.ClassElement) return false;
     throw UnsupportedError(
         'Analyzer doesn\'t appear to have an isExternal getter for classes?');
   }
@@ -74,10 +75,10 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
   @override
   Iterable<TypeDeclaration> get typeArguments sync* {
     var reference = originalReference;
-    if (reference is ParameterizedType) {
+    if (reference is analyzer.ParameterizedType) {
       for (var typeArgument in reference.typeArguments) {
         yield AnalyzerTypeDeclaration(
-            typeArgument.element! as TypeDefiningElement,
+            typeArgument.element! as analyzer.TypeDefiningElement,
             originalReference: typeArgument);
       }
     }
@@ -86,7 +87,7 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
   @override
   Iterable<TypeParameterDeclaration> get typeParameters sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var parameter in e.typeParameters) {
         yield AnalyzerTypeParameterDeclaration(parameter);
       }
@@ -96,13 +97,13 @@ class AnalyzerTypeDeclaration extends AnalyzerTypeReference
 
 class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
     implements TypeDefinition {
-  AnalyzerTypeDefinition._(TypeDefiningElement element,
-      {DartType? originalReference})
+  AnalyzerTypeDefinition._(analyzer.TypeDefiningElement element,
+      {analyzer.DartType? originalReference})
       : super(element, originalReference: originalReference);
 
-  factory AnalyzerTypeDefinition(TypeDefiningElement element,
-          {DartType? originalReference}) =>
-      element is ClassElement
+  factory AnalyzerTypeDefinition(analyzer.TypeDefiningElement element,
+          {analyzer.DartType? originalReference}) =>
+      element is analyzer.ClassElement
           ? AnalyzerClassDefinition(element,
               originalReference: originalReference)
           : AnalyzerTypeDefinition._(element,
@@ -114,10 +115,10 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
   @override
   Iterable<TypeDefinition> get typeArguments sync* {
     var reference = originalReference;
-    if (reference is ParameterizedType) {
+    if (reference is analyzer.ParameterizedType) {
       for (var typeArgument in reference.typeArguments) {
         yield AnalyzerTypeDefinition(
-            typeArgument.element! as TypeDefiningElement,
+            typeArgument.element as analyzer.TypeDefiningElement,
             originalReference: typeArgument);
       }
     }
@@ -126,7 +127,7 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
   @override
   Iterable<TypeParameterDefinition> get typeParameters sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var parameter in e.typeParameters) {
         yield AnalyzerTypeParameterDefinition(parameter);
       }
@@ -137,13 +138,14 @@ class AnalyzerTypeDefinition extends AnalyzerTypeDeclaration
 class AnalyzerClassType extends AnalyzerTypeReference
     with AnalyzerDeclarationType
     implements ClassType {
-  AnalyzerClassType(TypeDefiningElement element, {DartType? originalReference})
+  AnalyzerClassType(analyzer.TypeDefiningElement element,
+      {analyzer.DartType? originalReference})
       : super(element, originalReference: originalReference);
 
   @override
   TypeReference? get superclass {
     var e = element;
-    if (e is ClassElement && !e.isDartCoreObject) {
+    if (e is analyzer.ClassElement && !e.isDartCoreObject) {
       var superType = e.supertype!;
       return AnalyzerClassType(superType.element, originalReference: superType);
     }
@@ -152,7 +154,7 @@ class AnalyzerClassType extends AnalyzerTypeReference
   @override
   Iterable<TypeReference> get superinterfaces sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var interface in e.allSupertypes) {
         yield AnalyzerClassType(interface.element,
             originalReference: interface);
@@ -164,9 +166,10 @@ class AnalyzerClassType extends AnalyzerTypeReference
 class AnalyzerClassDeclaration extends AnalyzerTypeDeclaration
     implements ClassDeclaration {
   @override
-  ClassElement get element => super.element as ClassElement;
+  analyzer.ClassElement get element => super.element as analyzer.ClassElement;
 
-  AnalyzerClassDeclaration(ClassElement element, {DartType? originalReference})
+  AnalyzerClassDeclaration(analyzer.ClassElement element,
+      {analyzer.DartType? originalReference})
       : super(element, originalReference: originalReference);
 
   @override
@@ -213,14 +216,14 @@ class AnalyzerClassDeclaration extends AnalyzerTypeDeclaration
 
 class AnalyzerClassDefinition extends AnalyzerTypeDefinition
     implements ClassDefinition {
-  AnalyzerClassDefinition(TypeDefiningElement element,
-      {DartType? originalReference})
+  AnalyzerClassDefinition(analyzer.TypeDefiningElement element,
+      {analyzer.DartType? originalReference})
       : super._(element, originalReference: originalReference);
 
   @override
   Iterable<MethodDefinition> get constructors sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var constructor in e.constructors) {
         if (constructor.isSynthetic) continue;
         yield AnalyzerConstructorDefinition(constructor, parentClass: e);
@@ -231,7 +234,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   @override
   Iterable<FieldDefinition> get fields sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var field in e.fields) {
         if (field.isSynthetic) continue;
         yield AnalyzerFieldDefinition(field, parentClass: e);
@@ -242,7 +245,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   @override
   Iterable<MethodDefinition> get methods sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var method in e.methods) {
         if (method.isSynthetic) continue;
         yield AnalyzerMethodDefinition(method, parentClass: e);
@@ -253,7 +256,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   @override
   ClassDefinition? get superclass {
     var e = element;
-    if (e is ClassElement && !e.isDartCoreObject) {
+    if (e is analyzer.ClassElement && !e.isDartCoreObject) {
       var superType = e.supertype!;
       return AnalyzerClassDefinition(superType.element,
           originalReference: superType);
@@ -263,7 +266,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   @override
   Iterable<TypeDefinition> get superinterfaces sync* {
     var e = element;
-    if (e is ClassElement) {
+    if (e is analyzer.ClassElement) {
       for (var interface in e.allSupertypes) {
         yield AnalyzerClassDefinition(interface.element,
             originalReference: interface);
@@ -273,7 +276,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
 }
 
 abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
-  ExecutableElement get element;
+  analyzer.ExecutableElement get element;
 
   @override
   bool get isAbstract => element.isAbstract;
@@ -284,13 +287,13 @@ abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
   @override
   bool get isGetter {
     var e = element;
-    return e is PropertyAccessorElement && e.isGetter;
+    return e is analyzer.PropertyAccessorElement && e.isGetter;
   }
 
   @override
   bool get isSetter {
     var e = element;
-    return e is PropertyAccessorElement && e.isSetter;
+    return e is analyzer.PropertyAccessorElement && e.isSetter;
   }
 
   @override
@@ -312,7 +315,7 @@ abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
 
   @override
   TypeDeclaration get returnType => AnalyzerTypeDeclaration(
-      element.returnType.element! as TypeDefiningElement,
+      element.returnType.element! as analyzer.TypeDefiningElement,
       originalReference: element.returnType);
 
   @override
@@ -325,7 +328,7 @@ abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
 
 class AnalyzerFunctionDeclaration with _AnalyzerFunctionDeclaration {
   @override
-  final ExecutableElement element;
+  final analyzer.ExecutableElement element;
   AnalyzerFunctionDeclaration(this.element);
 }
 
@@ -333,17 +336,17 @@ class AnalyzerMethodDeclaration
     with _AnalyzerFunctionDeclaration
     implements MethodDeclaration {
   @override
-  final ExecutableElement element;
+  final analyzer.ExecutableElement element;
 
   AnalyzerMethodDeclaration(this.element);
 
   @override
-  TypeReference get definingClass =>
-      AnalyzerTypeReference(element.enclosingElement as TypeDefiningElement);
+  TypeReference get definingClass => AnalyzerTypeReference(
+      element.enclosingElement as analyzer.TypeDefiningElement);
 }
 
 abstract class _AnalyzerFunctionDefinition implements FunctionDefinition {
-  ExecutableElement get element;
+  analyzer.ExecutableElement get element;
 
   @override
   Map<String, ParameterDefinition> get namedParameters => {
@@ -363,7 +366,7 @@ abstract class _AnalyzerFunctionDefinition implements FunctionDefinition {
   TypeDefinition get returnType => element.returnType.element == null
       ? const VoidTypeDefinition()
       : AnalyzerTypeDefinition(
-          element.returnType.element! as TypeDefiningElement,
+          element.returnType.element! as analyzer.TypeDefiningElement,
           originalReference: element.returnType);
 
   @override
@@ -376,15 +379,16 @@ abstract class _AnalyzerFunctionDefinition implements FunctionDefinition {
 
 class AnalyzerFunctionDefinition extends AnalyzerFunctionDeclaration
     with _AnalyzerFunctionDefinition {
-  AnalyzerFunctionDefinition(ExecutableElement element) : super(element);
+  AnalyzerFunctionDefinition(analyzer.ExecutableElement element)
+      : super(element);
 }
 
 class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
     with _AnalyzerFunctionDefinition
     implements MethodDefinition {
-  final ClassElement parentClass;
+  final analyzer.ClassElement parentClass;
 
-  AnalyzerMethodDefinition(ExecutableElement element,
+  AnalyzerMethodDefinition(analyzer.ExecutableElement element,
       {required this.parentClass})
       : super(element);
 
@@ -393,7 +397,7 @@ class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
 }
 
 class AnalyzerConstructorDeclaration implements MethodDeclaration {
-  final ConstructorElement element;
+  final analyzer.ConstructorElement element;
 
   AnalyzerConstructorDeclaration(this.element);
 
@@ -445,10 +449,10 @@ class AnalyzerConstructorDeclaration implements MethodDeclaration {
 
 class AnalyzerConstructorDefinition extends AnalyzerConstructorDeclaration
     implements MethodDefinition {
-  final ClassElement _parentClass;
+  final analyzer.ClassElement _parentClass;
 
-  AnalyzerConstructorDefinition(ConstructorElement element,
-      {required ClassElement parentClass})
+  AnalyzerConstructorDefinition(analyzer.ConstructorElement element,
+      {required analyzer.ClassElement parentClass})
       : _parentClass = parentClass,
         super(element);
 
@@ -483,7 +487,7 @@ class AnalyzerConstructorDefinition extends AnalyzerConstructorDeclaration
 }
 
 class AnalyzerFieldDeclaration implements FieldDeclaration {
-  final FieldElement element;
+  final analyzer.FieldElement element;
 
   AnalyzerFieldDeclaration(this.element);
 
@@ -497,16 +501,17 @@ class AnalyzerFieldDeclaration implements FieldDeclaration {
   String get name => element.name;
 
   @override
-  TypeDeclaration get type =>
-      AnalyzerTypeDeclaration(element.type.element! as TypeDefiningElement,
-          originalReference: element.type);
+  TypeDeclaration get type => AnalyzerTypeDeclaration(
+      element.type.element! as analyzer.TypeDefiningElement,
+      originalReference: element.type);
 }
 
 class AnalyzerFieldDefinition extends AnalyzerFieldDeclaration
     implements FieldDefinition {
-  final ClassElement? _parentClass;
+  final analyzer.ClassElement? _parentClass;
 
-  AnalyzerFieldDefinition(FieldElement element, {ClassElement? parentClass})
+  AnalyzerFieldDefinition(analyzer.FieldElement element,
+      {analyzer.ClassElement? parentClass})
       : _parentClass = parentClass,
         super(element);
 
@@ -515,13 +520,13 @@ class AnalyzerFieldDefinition extends AnalyzerFieldDeclaration
       _parentClass == null ? null : AnalyzerClassDefinition(_parentClass!);
 
   @override
-  TypeDefinition get type =>
-      AnalyzerTypeDefinition(element.type.element! as TypeDefiningElement,
-          originalReference: element.type);
+  TypeDefinition get type => AnalyzerTypeDefinition(
+      element.type.element! as analyzer.TypeDefiningElement,
+      originalReference: element.type);
 }
 
 class AnalyzerParameterDeclaration implements ParameterDeclaration {
-  final ParameterElement element;
+  final analyzer.ParameterElement element;
 
   AnalyzerParameterDeclaration(this.element);
 
@@ -532,30 +537,32 @@ class AnalyzerParameterDeclaration implements ParameterDeclaration {
   bool get required => element.isRequiredPositional || element.isRequiredNamed;
 
   @override
-  TypeDeclaration get type =>
-      AnalyzerTypeDeclaration(element.type.element! as TypeDefiningElement,
-          originalReference: element.type);
+  TypeDeclaration get type => AnalyzerTypeDeclaration(
+      element.type.element! as analyzer.TypeDefiningElement,
+      originalReference: element.type);
 }
 
 class AnalyzerParameterDefinition extends AnalyzerParameterDeclaration
     implements ParameterDefinition {
-  AnalyzerParameterDefinition(ParameterElement element) : super(element);
+  AnalyzerParameterDefinition(analyzer.ParameterElement element)
+      : super(element);
 
   @override
-  TypeDefinition get type =>
-      AnalyzerTypeDefinition(element.type.element! as TypeDefiningElement,
-          originalReference: element.type);
+  TypeDefinition get type => AnalyzerTypeDefinition(
+      element.type.element! as analyzer.TypeDefiningElement,
+      originalReference: element.type);
 }
 
 class AnalyzerTypeParameterDeclaration implements TypeParameterDeclaration {
-  final TypeParameterElement element;
+  final analyzer.TypeParameterElement element;
 
   AnalyzerTypeParameterDeclaration(this.element);
 
   @override
   TypeDeclaration? get bounds => element.bound == null
       ? null
-      : AnalyzerTypeDeclaration(element.bound!.element! as TypeDefiningElement,
+      : AnalyzerTypeDeclaration(
+          element.bound!.element! as analyzer.TypeDefiningElement,
           originalReference: element.bound);
 
   @override
@@ -564,13 +571,14 @@ class AnalyzerTypeParameterDeclaration implements TypeParameterDeclaration {
 
 class AnalyzerTypeParameterDefinition extends AnalyzerTypeParameterDeclaration
     implements TypeParameterDefinition {
-  AnalyzerTypeParameterDefinition(TypeParameterElement element)
+  AnalyzerTypeParameterDefinition(analyzer.TypeParameterElement element)
       : super(element);
 
   @override
   TypeDefinition? get bounds => element.bound == null
       ? null
-      : AnalyzerTypeDefinition(element.bound!.element! as TypeDefiningElement,
+      : AnalyzerTypeDefinition(
+          element.bound!.element! as analyzer.TypeDefiningElement,
           originalReference: element.bound);
 }
 
