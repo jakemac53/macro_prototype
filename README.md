@@ -68,16 +68,11 @@ macro to the corresponding constructor for the phase in which it should run.
 
 You can see flutter examples under `flutter_example/macros`.
 
-Once you create a macro (under `flutter_example/lib/macros`) you will need to
-also create a special annotation class for it in
-`flutter_example/lib/annotations.dart`. This needs to be a separate class in
-order to avoid imports of `dart:mirrors` in the flutter application.
-
-Next you need to add your macro to all the phases in which it should run, see
-the `typesBuilder`, `declarationsBuilder`, and `definitionsBuilder` methods in
-`flutter_example/lib/builders.dart`. You should add a map entry where the key
-is the annotation for the macro, and the value is the macro that should be
-applied when that annotation is present.
+Once you create a macro you will need to add it to all the phases in which it
+should run, see the `typesBuilder`, `declarationsBuilder`, and
+`definitionsBuilder` methods in `flutter_example/lib/builders.dart`, and pass
+in your new macro to the corresponding constructor for the phase in which it
+should run.
 
 ## Using a Macro
 

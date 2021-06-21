@@ -1,4 +1,4 @@
-import 'package:macro_builder/macro_builder.dart';
+import 'package:macro_builder/definition.dart';
 
 const jsonSerializable = _JsonMacro();
 

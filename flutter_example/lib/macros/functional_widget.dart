@@ -1,6 +1,6 @@
-import 'package:macro_builder/macro_builder.dart';
+import 'package:macro_builder/definition.dart';
 
-const widgetMacro = _FunctionalWidget();
+const widget = _FunctionalWidget();
 
 class _FunctionalWidget implements FunctionDeclarationMacro {
   final String? widgetName;

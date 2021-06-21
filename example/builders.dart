@@ -1,5 +1,5 @@
 import 'package:build/build.dart';
-import 'package:macro_builder/macro_builder.dart';
+import 'package:macro_builder/builder.dart';
 
 import 'macros/data_class.dart';
 import 'macros/json.dart';

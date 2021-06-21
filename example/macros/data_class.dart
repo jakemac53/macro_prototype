@@ -1,5 +1,5 @@
 import 'package:collection/collection.dart';
-import 'package:macro_builder/macro_builder.dart';
+import 'package:macro_builder/definition.dart';
 
 const dataClass = _DataClass();
 

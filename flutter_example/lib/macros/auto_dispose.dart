@@ -1,6 +1,11 @@
-import 'package:macro_builder/macro_builder.dart';
+import 'package:macro_builder/definition.dart';
 
-const autoDisposeMacro = _AutoDisposeMacro();
+const autoDispose = _AutoDisposeMacro();
+
+// Interface for disposable things.
+abstract class Disposable {
+  void dispose();
+}
 
 class _AutoDisposeMacro
     implements ClassDeclarationMacro, MethodDefinitionMacro {

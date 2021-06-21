@@ -6,18 +6,8 @@ import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:source_gen/source_gen.dart';
 
+import 'definition.dart';
 import 'src/analyzer.dart';
-import 'src/declarations.dart';
-import 'src/definitions.dart';
-import 'src/code.dart';
-import 'src/macro.dart';
-import 'src/types.dart';
-
-export 'src/code.dart';
-export 'src/declarations.dart';
-export 'src/definitions.dart';
-export 'src/macro.dart';
-export 'src/types.dart';
 
 abstract class _MacroBuilder extends Builder {
   final Map<TypeChecker, Macro> macros;
@@ -640,24 +630,5 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
 
     // Return the original value and close the block.
     _buffer.writeln('return \$ret;\n}');
-  }
-}
-
-extension ToCode on TypeDeclaration {
-  // Recreates a string for the type declaration `d`, with type arguments if
-  // present as well as retaining `?` markers.
-  String toCode() {
-    var type = StringBuffer(name);
-    if (typeArguments.isNotEmpty) {
-      type.write('<');
-      var types = [];
-      for (var typeArg in typeArguments) {
-        types.add(typeArg.toCode());
-      }
-      type.write(types.join(', '));
-      type.write('>');
-    }
-    if (isNullable) type.write('?');
-    return type.toString();
   }
 }
