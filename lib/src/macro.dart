@@ -104,6 +104,17 @@ abstract class MethodDefinitionMacro implements DefinitionMacro {
       MethodDefinition definition, FunctionDefinitionBuilder builder);
 }
 
+/// The interface for [TypeMacro]s that can be applied to constructors.
+abstract class ConstructorTypeMacro implements TypeMacro {
+  void visitConstructorType(ConstructorType type, TypeBuilder builder);
+}
+
+/// The interface for [DeclarationMacro]s that can be applied to constructors.
+abstract class ConstructorDeclarationMacro implements DefinitionMacro {
+  void visitConstructorDeclaration(
+      ConstructorDeclaration declaration, ClassDeclarationBuilder builder);
+}
+
 /// The interface for [DefinitionMacro]s that can be applied to constructors.
 abstract class ConstructorDefinitionMacro implements DefinitionMacro {
   void visitConstructorDefinition(

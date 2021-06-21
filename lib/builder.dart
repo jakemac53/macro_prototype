@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:mirrors';
 
 import 'package:analyzer/dart/ast/ast.dart' as analyzer;
+import 'package:analyzer/dart/constant/value.dart' as analyzer;
 import 'package:analyzer/dart/element/element.dart' as analyzer;
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
@@ -174,21 +176,24 @@ class TypesMacroBuilder extends _MacroBuilder {
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
+    macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
     if (macro is ClassTypeMacro && element is analyzer.ClassElement) {
       macro.visitClassType(
           AnalyzerClassType(element), _MacroTypeBuilder(libraryBuffer));
     } else if (element is analyzer.FieldElement && macro is FieldTypeMacro) {
       throw UnimplementedError(
           'FieldTypeMacro is not implemented in this prototype');
-    } else if ((element is analyzer.MethodElement ||
-            element is analyzer.ConstructorElement) &&
-        macro is MethodTypeMacro) {
-      throw UnimplementedError(
-          'MethodTypeMacro is not implemented in this prototype');
+    } else if (element is analyzer.MethodElement && macro is MethodTypeMacro) {
+      macro.visitMethodType(
+          AnalyzerMethodType(element), _MacroTypeBuilder(libraryBuffer));
+    } else if (element is analyzer.ConstructorElement &&
+        macro is ConstructorTypeMacro) {
+      macro.visitConstructorType(
+          AnalyzerConstructorType(element), _MacroTypeBuilder(libraryBuffer));
     } else if (element is analyzer.FunctionElement &&
         macro is FunctionTypeMacro) {
-      throw UnimplementedError(
-          'FunctionTypeMacro is not implemented in this prototype');
+      macro.visitFunctionType(
+          AnalyzerFunctionType(element), _MacroTypeBuilder(libraryBuffer));
     }
   }
 }
@@ -211,6 +216,7 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
+    macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
     if (element is analyzer.ClassElement && macro is ClassDeclarationMacro) {
       macro.visitClassDeclaration(
           AnalyzerClassDeclaration(element),
@@ -257,6 +263,7 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       String originalSource) async {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
+    macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
     if (element is analyzer.FieldElement && macro is FieldDefinitionMacro) {
       var fieldBuffer = StringBuffer();
       var definition = AnalyzerFieldDefinition(element,
@@ -367,7 +374,7 @@ void _checkValidMacroApplication(analyzer.Element element, Macro macro) {
           'but was found on $element');
     }
   } else if (element is analyzer.FunctionElement) {
-    if (macro is! FunctionType &&
+    if (macro is! FunctionTypeMacro &&
         macro is! FunctionDeclarationMacro &&
         macro is! FunctionDefinitionMacro) {
       throw ArgumentError(
@@ -631,4 +638,37 @@ class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
     // Return the original value and close the block.
     _buffer.writeln('return \$ret;\n}');
   }
+}
+
+Macro _instantiateFromMeta(Macro macro, analyzer.DartObject constant) {
+  var clazz = reflectClass(macro.runtimeType);
+  var constructor = clazz.declarations.values.firstWhere((d) =>
+          d is MethodMirror && (d.isConstructor || d.isFactoryConstructor))
+      as MethodMirror;
+
+  var fields = clazz.declarations.values.whereType<VariableMirror>();
+  var reader = ConstantReader(constant);
+  var positionalArguments = [];
+  var namedArguments = <Symbol, Object?>{};
+  for (var param in constructor.parameters) {
+    var field =
+        fields.firstWhere((field) => field.simpleName == param.simpleName);
+    var value = reader.read(field.simpleName
+        .toString()
+        .replaceFirst('Symbol("', '')
+        .replaceFirst('")', ''));
+    if (!value.isLiteral) {
+      throw UnsupportedError(
+          'Only literal values are supported for macro constructors');
+    }
+    if (param.isNamed) {
+      namedArguments[param.simpleName] = value.literalValue;
+    } else {
+      positionalArguments.add(value.literalValue);
+    }
+  }
+  return clazz
+      .newInstance(
+          constructor.constructorName, positionalArguments, namedArguments)
+      .reflectee as Macro;
 }

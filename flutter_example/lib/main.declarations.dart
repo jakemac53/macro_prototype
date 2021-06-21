@@ -6,28 +6,22 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  final String? appTitle;
-  final String? homePageTitle;
-  const MyApp({
-    this.appTitle,
-    this.homePageTitle,
-    Key? key,
-  }) : super(key: key);
-  @override
-  Widget build(BuildContext context) => _myApp(
-        context,
-        appTitle: appTitle,
-        homePageTitle: homePageTitle,
-      );
-}
-
-@widget
-Widget _myApp(BuildContext context, {String? appTitle, String? homePageTitle}) {
+@FunctionalWidget(widgetName: 'MyApp')
+Widget _buildApp(BuildContext context,
+    {String? appTitle, String? homePageTitle}) {
   return MaterialApp(
       title: appTitle ?? 'Flutter Demo',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: MyHomePage(title: homePageTitle ?? 'Flutter Demo Home Page'));
+}
+
+class MyApp extends StatelessWidget {
+  final String? appTitle;
+  final String? homePageTitle;
+  @override
+  Widget build(BuildContext context) =>
+      _buildApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
+  const MyApp({this.appTitle, this.homePageTitle, Key? key}) : super(key: key);
 }
 
 class MyHomePage extends StatefulWidget {

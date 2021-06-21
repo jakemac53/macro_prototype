@@ -7,8 +7,9 @@ void main() {
   runApp(const MyApp());
 }
 
-@widget
-Widget _myApp(BuildContext context, {String? appTitle, String? homePageTitle}) {
+@FunctionalWidget(widgetName: 'MyApp')
+Widget _buildApp(BuildContext context,
+    {String? appTitle, String? homePageTitle}) {
   return MaterialApp(
       title: appTitle ?? 'Flutter Demo',
       theme: ThemeData(primarySwatch: Colors.blue),

@@ -3,6 +3,7 @@ import 'types.dart';
 
 /// Type annotation introspection information for [DeclarationMacro]s.
 abstract class TypeDeclaration implements TypeReference, DeclarationType {
+  @override
   Iterable<TypeDeclaration> get typeArguments;
 
   Iterable<TypeParameterDeclaration> get typeParameters;

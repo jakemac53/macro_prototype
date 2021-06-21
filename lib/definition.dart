@@ -1,4 +1,4 @@
-import 'src/declarations.dart';
+import 'src/types.dart';
 
 export 'src/code.dart';
 export 'src/declarations.dart';
@@ -6,7 +6,7 @@ export 'src/definitions.dart';
 export 'src/macro.dart';
 export 'src/types.dart';
 
-extension ToCode on TypeDeclaration {
+extension ToCode on TypeReference {
   // Recreates a string for the type declaration `d`, with type arguments if
   // present as well as retaining `?` markers.
   String toCode() {

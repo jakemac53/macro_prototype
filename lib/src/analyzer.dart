@@ -25,6 +25,18 @@ class AnalyzerTypeReference implements TypeReference {
   Scope get scope => throw UnimplementedError();
 
   @override
+  Iterable<TypeReference> get typeArguments sync* {
+    var reference = originalReference;
+    if (reference is analyzer.ParameterizedType) {
+      for (var typeArgument in reference.typeArguments) {
+        yield AnalyzerTypeReference(
+            typeArgument.element! as analyzer.TypeDefiningElement,
+            originalReference: typeArgument);
+      }
+    }
+  }
+
+  @override
   // TODO: Scope, once we have that
   Code get reference => Fragment('$name${isNullable ? '?' : ''}');
 }
@@ -275,7 +287,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
   }
 }
 
-abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
+abstract class _AnalyzerFunctionType implements FunctionType {
   analyzer.ExecutableElement get element;
 
   @override
@@ -299,6 +311,42 @@ abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
   @override
   String get name => element.name;
 
+  @override
+  Map<String, ParameterType> get namedParameters => {
+        for (var param in element.parameters)
+          if (param.isNamed) param.name: AnalyzerParameterType(param),
+      };
+
+  @override
+  Iterable<ParameterType> get positionalParameters sync* {
+    for (var param in element.parameters) {
+      if (!param.isPositional) continue;
+      yield AnalyzerParameterType(param);
+    }
+  }
+
+  @override
+  TypeReference get returnType => AnalyzerTypeReference(
+      element.returnType.element! as analyzer.TypeDefiningElement,
+      originalReference: element.returnType);
+
+  @override
+  Iterable<TypeParameterType> get typeParameters sync* {
+    for (var typeParam in element.typeParameters) {
+      yield AnalyzerTypeParameterType(typeParam);
+    }
+  }
+}
+
+class AnalyzerFunctionType with _AnalyzerFunctionType {
+  @override
+  final analyzer.ExecutableElement element;
+  AnalyzerFunctionType(this.element);
+}
+
+abstract class _AnalyzerFunctionDeclaration
+    with _AnalyzerFunctionType
+    implements FunctionDeclaration {
   @override
   Map<String, ParameterDeclaration> get namedParameters => {
         for (var param in element.parameters)
@@ -326,14 +374,24 @@ abstract class _AnalyzerFunctionDeclaration implements FunctionDeclaration {
   }
 }
 
-class AnalyzerFunctionDeclaration with _AnalyzerFunctionDeclaration {
+class AnalyzerFunctionDeclaration extends _AnalyzerFunctionDeclaration {
   @override
   final analyzer.ExecutableElement element;
   AnalyzerFunctionDeclaration(this.element);
 }
 
-class AnalyzerMethodDeclaration
-    with _AnalyzerFunctionDeclaration
+class AnalyzerMethodType extends _AnalyzerFunctionDeclaration
+    implements MethodDeclaration {
+  @override
+  final analyzer.ExecutableElement element;
+  AnalyzerMethodType(this.element);
+
+  @override
+  TypeReference get definingClass => AnalyzerTypeReference(
+      element.enclosingElement as analyzer.TypeDefiningElement);
+}
+
+class AnalyzerMethodDeclaration extends _AnalyzerFunctionDeclaration
     implements MethodDeclaration {
   @override
   final analyzer.ExecutableElement element;
@@ -396,10 +454,10 @@ class AnalyzerMethodDefinition extends AnalyzerMethodDeclaration
   ClassDefinition get definingClass => AnalyzerClassDefinition(parentClass);
 }
 
-class AnalyzerConstructorDeclaration implements ConstructorDeclaration {
+class AnalyzerConstructorType implements ConstructorType {
   final analyzer.ConstructorElement element;
 
-  AnalyzerConstructorDeclaration(this.element);
+  AnalyzerConstructorType(this.element);
 
   @override
   TypeReference get definingClass =>
@@ -423,6 +481,37 @@ class AnalyzerConstructorDeclaration implements ConstructorDeclaration {
   @override
   String get name => element.name;
 
+  @override
+  Map<String, ParameterType> get namedParameters => {
+        for (var param in element.parameters)
+          if (param.isNamed) param.name: AnalyzerParameterType(param),
+      };
+
+  @override
+  Iterable<ParameterType> get positionalParameters sync* {
+    for (var param in element.parameters) {
+      if (!param.isPositional) continue;
+      yield AnalyzerParameterType(param);
+    }
+  }
+
+  @override
+  TypeReference get returnType =>
+      AnalyzerTypeReference(element.returnType.element,
+          originalReference: element.returnType);
+
+  @override
+  Iterable<TypeParameterType> get typeParameters sync* {
+    for (var typeParam in element.typeParameters) {
+      yield AnalyzerTypeParameterType(typeParam);
+    }
+  }
+}
+
+class AnalyzerConstructorDeclaration extends AnalyzerConstructorType
+    implements ConstructorDeclaration {
+  AnalyzerConstructorDeclaration(analyzer.ConstructorElement element)
+      : super(element);
   @override
   Map<String, ParameterDeclaration> get namedParameters => {
         for (var param in element.parameters)
@@ -528,10 +617,27 @@ class AnalyzerFieldDefinition extends AnalyzerFieldDeclaration
       originalReference: element.type);
 }
 
-class AnalyzerParameterDeclaration implements ParameterDeclaration {
+class AnalyzerParameterType implements ParameterType {
   final analyzer.ParameterElement element;
 
-  AnalyzerParameterDeclaration(this.element);
+  AnalyzerParameterType(this.element);
+
+  @override
+  String get name => element.name;
+
+  @override
+  bool get required => element.isRequiredPositional || element.isRequiredNamed;
+
+  @override
+  TypeReference get type => AnalyzerTypeReference(
+      element.type.element! as analyzer.TypeDefiningElement,
+      originalReference: element.type);
+}
+
+class AnalyzerParameterDeclaration extends AnalyzerParameterType
+    implements ParameterDeclaration {
+  AnalyzerParameterDeclaration(analyzer.ParameterElement element)
+      : super(element);
 
   @override
   String get name => element.name;
@@ -556,13 +662,13 @@ class AnalyzerParameterDefinition extends AnalyzerParameterDeclaration
       originalReference: element.type);
 }
 
-class AnalyzerTypeParameterDeclaration implements TypeParameterDeclaration {
+class AnalyzerTypeParameterType implements TypeParameterType {
   final analyzer.TypeParameterElement element;
 
-  AnalyzerTypeParameterDeclaration(this.element);
+  AnalyzerTypeParameterType(this.element);
 
   @override
-  TypeDeclaration? get bounds => element.bound == null
+  TypeReference? get bounds => element.bound == null
       ? null
       : AnalyzerTypeDeclaration(
           element.bound!.element! as analyzer.TypeDefiningElement,
@@ -570,6 +676,19 @@ class AnalyzerTypeParameterDeclaration implements TypeParameterDeclaration {
 
   @override
   String get name => element.name;
+}
+
+class AnalyzerTypeParameterDeclaration extends AnalyzerTypeParameterType
+    implements TypeParameterDeclaration {
+  AnalyzerTypeParameterDeclaration(analyzer.TypeParameterElement element)
+      : super(element);
+
+  @override
+  TypeDeclaration? get bounds => element.bound == null
+      ? null
+      : AnalyzerTypeDeclaration(
+          element.bound!.element! as analyzer.TypeDefiningElement,
+          originalReference: element.bound);
 }
 
 class AnalyzerTypeParameterDefinition extends AnalyzerTypeParameterDeclaration

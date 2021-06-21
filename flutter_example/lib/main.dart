@@ -6,8 +6,9 @@ void main() {
   runApp(const MyApp());
 }
 
-@widget
-Widget _myApp(BuildContext context, {String? appTitle, String? homePageTitle}) {
+@FunctionalWidget(widgetName: 'MyApp')
+Widget _buildApp(BuildContext context,
+    {String? appTitle, String? homePageTitle}) {
   return MaterialApp(
       title: appTitle ?? 'Flutter Demo',
       theme: ThemeData(primarySwatch: Colors.blue),
@@ -19,7 +20,7 @@ class MyApp extends StatelessWidget {
   final String? homePageTitle;
   @override
   Widget build(BuildContext context) =>
-      _myApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
+      _buildApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
   const MyApp({this.appTitle, this.homePageTitle, Key? key}) : super(key: key);
 }
 

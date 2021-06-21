@@ -2,15 +2,12 @@ import 'code.dart';
 
 /// Type annotation introspection information for [TypeMacro]s.
 abstract class TypeReference {
-  /// The name of the type as it exists in the type annotation.
-  String get name;
-
   /// Whether or not the type reference is explicitly nullable (contains a
   /// trailing `?`)
   bool get isNullable;
 
-  /// The scope in which the type reference appeared in the program.
-  Scope get scope;
+  /// The name of the type as it exists in the type annotation.
+  String get name;
 
   /// Emits a piece of code that concretely refers to the same type that is
   /// referred to by [this], regardless of where in the program it is placed.
@@ -18,6 +15,12 @@ abstract class TypeReference {
   /// Effectively, this type reference has a custom scope (equal to [scope])
   /// instead of the standard lexical scope.
   Code get reference;
+
+  /// The scope in which the type reference appeared in the program.
+  Scope get scope;
+
+  /// The type arguments, if applicable.
+  Iterable<TypeReference> get typeArguments;
 }
 
 /// Declaration introspection information for [TypeMacro]s.

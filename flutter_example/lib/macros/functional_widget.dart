@@ -1,19 +1,18 @@
 import 'package:macro_builder/definition.dart';
 
-const widget = _FunctionalWidget();
+const widget = FunctionalWidget();
 
-class _FunctionalWidget implements FunctionDeclarationMacro {
+class FunctionalWidget implements FunctionTypeMacro {
   final String? widgetName;
 
-  const _FunctionalWidget(
+  const FunctionalWidget(
       {
       // Defaults to removing the `_` and calling `toUpperCase` on the next
       // character.
       this.widgetName});
 
   @override
-  void visitFunctionDeclaration(
-      FunctionDeclaration declaration, DeclarationBuilder builder) {
+  void visitFunctionType(FunctionType declaration, TypeBuilder builder) {
     if (!declaration.name.startsWith('_')) {
       throw ArgumentError(
           'FunctionalWidget should only be used on private declarations');
@@ -56,7 +55,7 @@ Widget build(BuildContext context) =>
       ');',
     ]);
 
-    builder.addToLibrary(Declaration.fromParts([
+    builder.addTypeToLibary(Declaration.fromParts([
       'class $widgetName extends StatelessWidget {',
       ...fields,
       constructor,
