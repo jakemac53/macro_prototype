@@ -13,6 +13,71 @@ This phases approach allows us to provide consistent, correct results for the
 introspection apis that are available, while simultaneously providing a lot
 of power in the form of adding entirely new declarations to the program.
 
+## Evaluation Guidelines
+
+This prototype **is not** intended to reflect the final dev experience.
+Specifically, the IDE and codegen experience you see here is not a
+reflection of the final expected product. The actual feature would be built
+into the compilation pipelines you already use, and you would not see any
+generated files in your source directory.
+
+We would like feedback focused on any other area though, such as:
+
+- Does this provide enough functionality for you to do everything you want to?
+- General feedback on the macro apis (anything exported by
+  `lib/definition.dart`).
+- General feedback on the multi-phased approach.
+- Any other feedback unrelated to build_runner or the specific code generation
+  process used in this prototype.
+
+Note that if  you do implement some macros, we would love for you to contribute
+them to the repo so we have more concrete examples of the use cases!
+
+## Intro to the Macro interfaces
+
+Each type of macro has it's own interface, each of which have a single method
+that you must implement. These methods each take two arguments, the first
+argument is the object you use to introspect on the object that was annotated
+with the macro, and the second argument is a builder object used to modify the
+program.
+
+For example, lets take a look at the `ClassDeclarationMacro` interface:
+
+```dart
+/// The interface for [DeclarationMacro]s that can be applied to classes.
+abstract class ClassDeclarationMacro implements DeclarationMacro {
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder);
+}
+```
+
+This macro is given a `ClassDeclaration` object as the first argument, which
+gives you all the reflective information available for a class, in the
+"declaration" phase (phase 2).
+
+The second argument is a `ClassDeclarationBuilder`, which has an
+`addToClass(Declaration declaration)` method you can use to add new
+declarations to the class. A `ClassDeclarationBuilder` is also a
+`DeclarationBuilder`, which gives you the ability to add top level declarations
+with the `addToLibrary(Declaration declaration)` method.
+
+### Implementing Multiple Macro Interfaces
+
+A single macro class is allowed to implement multiple macro interfaces, which
+allows it to run in several phases. As an example of this you can look at the
+`example/macros/json.dart` macro, which implements three different macro
+interfaces. First, is the `ClassDeclarationMacro`, which it uses to define the
+interface only of the `fromJson` constructor and `toJson` methods.
+
+It then also implements the `ConstructorDefinitionMacro` and
+`MethodDefinitionMacro` interfaces which it uses to fill in those declarations
+with the full implementations.
+
+Note that a macro can provide a full definition in the declaration phase, but
+the json macro needs more reflective information than is available to it in
+that phase, so it waits until the later phase where it can fully introspect
+on the program to fill in the implementations.
+
 ### Phase 1 - Type Macros
 
 These macros have almost no introspection capability, but are allowed to
@@ -21,10 +86,6 @@ introduce entirely new classes to the application.
 To make a macro run in this phase you should implement either `ClassTypeMacro`,
 `FieldTypeMacro`, or `MethodTypeMacro`, depending on which type of declaration
 your macro supports running on.
-
-The object you recieve in the `type` method that you implement will have an
-`addTypeToLibary(Code declaration)` method, which you can use to add new types
-to the program.
 
 ### Phase 2 - Declaration Macros
 
