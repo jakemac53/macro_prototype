@@ -122,17 +122,27 @@ abstract class ConstructorDefinitionMacro implements DefinitionMacro {
 }
 
 /// The api used by [TypeMacro]s to contribute new type declarations to the
-/// current library.
+/// current library, and get [TypeReference]s from runtime [Type] objects.
 abstract class TypeBuilder {
+  /// Adds a new type declaration to the surrounding library.
   void addTypeToLibary(Declaration typeDeclaration);
+
+  /// Used to construct a [TypeReference] to a runtime type available to the
+  /// the macro implementation code.
+  TypeReference typeReferenceOf<T>();
 }
 
 /// The api used by [DeclarationMacro]s to contribute new declarations to the
-/// current library.
-///
-/// Note that type defining declarations are not allowed to be contributed.
+/// current library, and get [TypeDeclaration]s from runtime [Type] objects.
 abstract class DeclarationBuilder {
+  /// Adds a new regular declaration to the surrounding library.
+  ///
+  /// Note that type declarations are not supported.
   void addToLibrary(Declaration declaration);
+
+  /// Used to construct a [TypeReference] to a runtime type available to the
+  /// the macro implementation code.
+  TypeDeclaration typeDeclarationOf<T>();
 }
 
 /// The api used by [DeclarationMacro]s to contribute new declarations to the
@@ -141,7 +151,20 @@ abstract class DeclarationBuilder {
 /// Note that this is available to macros that run directly on classes, as well
 /// as macros that run on any members of a class.
 abstract class ClassDeclarationBuilder implements DeclarationBuilder {
+  /// Adds a new declaration to the surrounding class.
   void addToClass(Declaration declaration);
+}
+
+/// The api implemented by builder objects provided to [DefinitionMacro]s.
+///
+/// Each type of macro has its own specialized versions of this interface
+/// depending on the type of declaration.
+///
+/// This is also used to create [TypeDefinition]s from runtime [Type] objects.
+abstract class DefinitionBuilder {
+  /// Used to construct a [TypeDefinition] to a runtime type available to the
+  /// the macro implementation code.
+  TypeDefinition typeDefinitionOf<T>();
 }
 
 /// The apis used by [DefinitionMacro]s to define the body of abstract or
@@ -149,7 +172,7 @@ abstract class ClassDeclarationBuilder implements DeclarationBuilder {
 /// with additional statements.
 ///
 /// Note that factory constructors should only provide a [body].
-abstract class ConstructorDefinitionBuilder {
+abstract class ConstructorDefinitionBuilder implements DefinitionBuilder {
   /// Used to implement a constructor with a combination of initializers and/or
   /// a constructor body.
   void implement({FunctionBody? body, List<Code>? initializers});
@@ -193,7 +216,7 @@ abstract class ConstructorDefinitionBuilder {
 /// The apis used by [DefinitionMacro]s to define the body of abstract or
 /// external functions (or methods), as well as wrap the body of concrete
 /// functions or methods with additional statements.
-abstract class FunctionDefinitionBuilder {
+abstract class FunctionDefinitionBuilder implements DefinitionBuilder {
   void implement(FunctionBody body, {List<Code>? supportingDeclarations});
 
   /// Used to wrap the body of a function, by running some code before or after
@@ -236,7 +259,7 @@ abstract class FunctionDefinitionBuilder {
 /// fields.
 ///
 /// Note that concrete fields cannot be implemented in this way.
-abstract class FieldDefinitionBuilder {
+abstract class FieldDefinitionBuilder implements DefinitionBuilder {
   /// Implement this as a normal field and supply an initializer.
   void withInitializer(Expression body, {List<Code>? supportingDeclarations});
 

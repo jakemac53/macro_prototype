@@ -31,12 +31,12 @@ external void dispose();
   @override
   void visitMethodDefinition(
       MethodDefinition definition, FunctionDefinitionBuilder builder) {
+    var disposable = builder.typeDefinitionOf<Disposable>();
     var disposeCalls = <Statement>[];
     for (var field in definition.definingClass.fields) {
       var type = field.type;
       if (type is! ClassDefinition) continue;
-      // TODO: use isSubtypeOf if/once implemented.
-      if (!type.superinterfaces.any((i) => i.name == 'Disposable')) continue;
+      if (!type.isSubtype(disposable)) continue;
       disposeCalls.add(Statement('${field.name}.dispose();'));
     }
     // Provide a full implementation if not yet implemented, otherwise just

@@ -7,6 +7,7 @@ import 'package:analyzer/dart/element/element.dart' as analyzer;
 import 'package:build/build.dart';
 import 'package:dart_style/dart_style.dart';
 import 'package:source_gen/source_gen.dart';
+import 'package:source_gen/src/utils.dart';
 
 import 'definition.dart';
 import 'src/analyzer.dart';
@@ -179,21 +180,22 @@ class TypesMacroBuilder extends _MacroBuilder {
     macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
     if (macro is ClassTypeMacro && element is analyzer.ClassElement) {
       macro.visitClassType(
-          AnalyzerClassType(element), _MacroTypeBuilder(libraryBuffer));
+          AnalyzerClassType(element, originalReference: element.thisType),
+          _MacroTypeBuilder(libraryBuffer, element.library));
     } else if (element is analyzer.FieldElement && macro is FieldTypeMacro) {
       throw UnimplementedError(
           'FieldTypeMacro is not implemented in this prototype');
     } else if (element is analyzer.MethodElement && macro is MethodTypeMacro) {
-      macro.visitMethodType(
-          AnalyzerMethodType(element), _MacroTypeBuilder(libraryBuffer));
+      macro.visitMethodType(AnalyzerMethodType(element),
+          _MacroTypeBuilder(libraryBuffer, element.library));
     } else if (element is analyzer.ConstructorElement &&
         macro is ConstructorTypeMacro) {
-      macro.visitConstructorType(
-          AnalyzerConstructorType(element), _MacroTypeBuilder(libraryBuffer));
+      macro.visitConstructorType(AnalyzerConstructorType(element),
+          _MacroTypeBuilder(libraryBuffer, element.library));
     } else if (element is analyzer.FunctionElement &&
         macro is FunctionTypeMacro) {
-      macro.visitFunctionType(
-          AnalyzerFunctionType(element), _MacroTypeBuilder(libraryBuffer));
+      macro.visitFunctionType(AnalyzerFunctionType(element),
+          _MacroTypeBuilder(libraryBuffer, element.library));
     }
   }
 }
@@ -219,9 +221,12 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
     macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
     if (element is analyzer.ClassElement && macro is ClassDeclarationMacro) {
       macro.visitClassDeclaration(
-          AnalyzerClassDeclaration(element),
+          AnalyzerClassDeclaration(element,
+              originalReference: element.thisType),
           _MacroClassDeclarationBuilder(
-              classBuffer: buffer, libraryBuffer: libraryBuffer));
+              classBuffer: buffer,
+              libraryBuffer: libraryBuffer,
+              libraryElement: element.library));
 
       // TODO: return list of names of declarations modified
     } else if (element is analyzer.FieldElement &&
@@ -229,18 +234,24 @@ class DeclarationsMacroBuilder extends _MacroBuilder {
       macro.visitFieldDeclaration(
           AnalyzerFieldDeclaration(element),
           _MacroClassDeclarationBuilder(
-              classBuffer: buffer, libraryBuffer: libraryBuffer));
+              classBuffer: buffer,
+              libraryBuffer: libraryBuffer,
+              libraryElement: element.library));
     } else if ((element is analyzer.MethodElement ||
             element is analyzer.ConstructorElement) &&
         macro is MethodDeclarationMacro) {
       macro.visitMethodDeclaration(
           AnalyzerMethodDeclaration(element as analyzer.ExecutableElement),
           _MacroClassDeclarationBuilder(
-              classBuffer: buffer, libraryBuffer: libraryBuffer));
+              classBuffer: buffer,
+              libraryBuffer: libraryBuffer,
+              libraryElement: element.library));
     } else if (element is analyzer.FunctionElement &&
         macro is FunctionDeclarationMacro) {
-      macro.visitFunctionDeclaration(AnalyzerMethodDeclaration(element),
-          _MacroLibraryDeclarationBuilder(libraryBuffer: libraryBuffer));
+      macro.visitFunctionDeclaration(
+          AnalyzerMethodDeclaration(element),
+          _MacroLibraryDeclarationBuilder(
+              libraryBuffer: libraryBuffer, libraryElement: element.library));
     }
   }
 }
@@ -266,12 +277,15 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
     macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
     if (element is analyzer.FieldElement && macro is FieldDefinitionMacro) {
       var fieldBuffer = StringBuffer();
-      var definition = AnalyzerFieldDefinition(element,
-          parentClass: element.enclosingElement as analyzer.ClassElement?);
-      var parent = AnalyzerClassDefinition(
-          element.enclosingElement as analyzer.ClassElement);
+      var parentClass = element.enclosingElement as analyzer.ClassElement;
+      var definition =
+          AnalyzerFieldDefinition(element, parentClass: parentClass);
+      var parent = AnalyzerClassDefinition(parentClass,
+          originalReference: parentClass.thisType);
       macro.visitFieldDefinition(
-          definition, _MacroFieldDefinitionBuilder(buffer, definition, parent));
+          definition,
+          _MacroFieldDefinitionBuilder(
+              buffer, definition, parent, element.library));
       if (fieldBuffer.isNotEmpty) {
         var node = (await resolver.astNodeFor(element, resolve: true))!
             .parent!
@@ -287,14 +301,12 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       var methodBuffer = StringBuffer();
       FunctionDefinitionBuilder builder;
       MethodDefinition definition;
-      var parent = AnalyzerClassDefinition(
-          element.enclosingElement as analyzer.ClassElement);
       var node = (await resolver.astNodeFor(element, resolve: true))
           as analyzer.Declaration;
       definition = AnalyzerMethodDefinition(element,
           parentClass: element.enclosingElement as analyzer.ClassElement);
       builder = _MacroFunctionDefinitionBuilder(
-          methodBuffer, definition, parent, node, originalSource);
+          methodBuffer, definition, node, originalSource, element.library);
       macro.visitMethodDefinition(definition, builder);
       if (methodBuffer.isNotEmpty) {
         for (var meta in node.metadata) {
@@ -308,13 +320,15 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
       var methodBuffer = StringBuffer();
       ConstructorDefinitionBuilder builder;
       ConstructorDefinition definition;
-      var parent = AnalyzerClassDefinition(element.enclosingElement);
+      var parentClass = element.enclosingElement;
+      var parent = AnalyzerClassDefinition(parentClass,
+          originalReference: parentClass.thisType);
       var node = (await resolver.astNodeFor(element, resolve: true))
           as analyzer.ConstructorDeclaration;
       definition = AnalyzerConstructorDefinition(element,
           parentClass: element.enclosingElement);
-      builder = _MacroConstructorDefinitionBuilder(
-          methodBuffer, definition, parent, node, originalSource);
+      builder = _MacroConstructorDefinitionBuilder(methodBuffer, definition,
+          parent, node, originalSource, element.library);
 
       macro.visitConstructorDefinition(definition, builder);
       if (methodBuffer.isNotEmpty) {
@@ -328,12 +342,10 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
         macro is FunctionDefinitionMacro) {
       var fnBuffer = StringBuffer();
       var definition = AnalyzerFunctionDefinition(element);
-      var parent = AnalyzerClassDefinition(
-          element.enclosingElement as analyzer.ClassElement);
       var node = (await resolver.astNodeFor(element, resolve: true))
           as analyzer.Declaration;
       var builder = _MacroFunctionDefinitionBuilder(
-          fnBuffer, definition, parent, node, originalSource);
+          fnBuffer, definition, node, originalSource, element.library);
       macro.visitFunctionDefinition(definition, builder);
       if (fnBuffer.isNotEmpty) {
         for (var meta in node.metadata) {
@@ -386,18 +398,41 @@ void _checkValidMacroApplication(analyzer.Element element, Macro macro) {
 
 class _MacroTypeBuilder implements TypeBuilder {
   final StringBuffer _libraryBuffer;
+  final analyzer.LibraryElement _libraryElement;
 
-  _MacroTypeBuilder(this._libraryBuffer);
+  _MacroTypeBuilder(this._libraryBuffer, this._libraryElement);
 
   @override
   void addTypeToLibary(Code declaration) => _libraryBuffer.writeln(declaration);
+
+  @override
+  TypeReference typeReferenceOf<T>() {
+    var element = _elementFor<T>(_libraryElement);
+    return AnalyzerTypeReference(element, originalReference: element.thisType);
+  }
 }
 
-class _MacroLibraryDeclarationBuilder implements DeclarationBuilder {
+abstract class _DeclarationBuilder implements DeclarationBuilder {
+  final analyzer.LibraryElement _libraryElement;
+
+  _DeclarationBuilder(this._libraryElement);
+
+  @override
+  TypeDeclaration typeDeclarationOf<T>() {
+    var element = _elementFor<T>(_libraryElement);
+    return AnalyzerTypeDeclaration(element,
+        originalReference: element.thisType);
+  }
+}
+
+class _MacroLibraryDeclarationBuilder extends _DeclarationBuilder {
   final StringBuffer _libraryBuffer;
 
-  _MacroLibraryDeclarationBuilder({required StringBuffer libraryBuffer})
-      : _libraryBuffer = libraryBuffer;
+  _MacroLibraryDeclarationBuilder({
+    required StringBuffer libraryBuffer,
+    required analyzer.LibraryElement libraryElement,
+  })  : _libraryBuffer = libraryBuffer,
+        super(libraryElement);
 
   @override
   void addToLibrary(Code declaration) => _libraryBuffer.writeln(declaration);
@@ -407,22 +442,38 @@ class _MacroClassDeclarationBuilder extends _MacroLibraryDeclarationBuilder
     implements ClassDeclarationBuilder {
   final StringBuffer _classBuffer;
 
-  _MacroClassDeclarationBuilder(
-      {required StringBuffer classBuffer, required StringBuffer libraryBuffer})
-      : _classBuffer = classBuffer,
-        super(libraryBuffer: libraryBuffer);
+  _MacroClassDeclarationBuilder({
+    required StringBuffer classBuffer,
+    required StringBuffer libraryBuffer,
+    required analyzer.LibraryElement libraryElement,
+  })  : _classBuffer = classBuffer,
+        super(libraryBuffer: libraryBuffer, libraryElement: libraryElement);
 
   @override
   void addToClass(Code declaration) => _classBuffer.writeln(declaration);
 }
 
-class _MacroFieldDefinitionBuilder implements FieldDefinitionBuilder {
+abstract class _DefinitionBuilder implements DefinitionBuilder {
+  final analyzer.LibraryElement _libraryElement;
+
+  _DefinitionBuilder(this._libraryElement);
+
+  @override
+  TypeDefinition typeDefinitionOf<T>() {
+    var element = _elementFor<T>(_libraryElement);
+    return AnalyzerTypeDefinition(element, originalReference: element.thisType);
+  }
+}
+
+class _MacroFieldDefinitionBuilder extends _DefinitionBuilder
+    implements FieldDefinitionBuilder {
   final StringBuffer _buffer;
   final FieldDefinition _definition;
   final ClassDefinition definingClass;
 
-  _MacroFieldDefinitionBuilder(
-      this._buffer, this._definition, this.definingClass);
+  _MacroFieldDefinitionBuilder(this._buffer, this._definition,
+      this.definingClass, analyzer.LibraryElement libraryElement)
+      : super(libraryElement);
 
   @override
   void withInitializer(Code body, {List<Code>? supportingDeclarations}) {
@@ -442,7 +493,7 @@ ${_definition.type.toCode()} ${_definition.name} = $body;''');
   }
 }
 
-class _MacroConstructorDefinitionBuilder
+class _MacroConstructorDefinitionBuilder extends _DefinitionBuilder
     implements ConstructorDefinitionBuilder {
   final StringBuffer _buffer;
   final FunctionDefinition _definition;
@@ -450,8 +501,14 @@ class _MacroConstructorDefinitionBuilder
   final analyzer.ConstructorDeclaration _node;
   final String _originalSource;
 
-  _MacroConstructorDefinitionBuilder(this._buffer, this._definition,
-      this.definingClass, this._node, this._originalSource);
+  _MacroConstructorDefinitionBuilder(
+      this._buffer,
+      this._definition,
+      this.definingClass,
+      this._node,
+      this._originalSource,
+      analyzer.LibraryElement libraryElement)
+      : super(libraryElement);
 
   @override
   void implement({FunctionBody? body, List<Code>? initializers}) {
@@ -532,15 +589,16 @@ class _MacroConstructorDefinitionBuilder
   }
 }
 
-class _MacroFunctionDefinitionBuilder implements FunctionDefinitionBuilder {
+class _MacroFunctionDefinitionBuilder extends _DefinitionBuilder
+    implements FunctionDefinitionBuilder {
   final StringBuffer _buffer;
   final FunctionDefinition _definition;
-  final ClassDefinition definingClass;
   final analyzer.Declaration _node;
   final String _originalSource;
 
-  _MacroFunctionDefinitionBuilder(this._buffer, this._definition,
-      this.definingClass, this._node, this._originalSource);
+  _MacroFunctionDefinitionBuilder(this._buffer, this._definition, this._node,
+      this._originalSource, analyzer.LibraryElement libraryElement)
+      : super(libraryElement);
 
   @override
   void implement(Code code, {List<Code>? supportingDeclarations}) {
@@ -671,4 +729,27 @@ Macro _instantiateFromMeta(Macro macro, analyzer.DartObject constant) {
       .newInstance(
           constructor.constructorName, positionalArguments, namedArguments)
       .reflectee as Macro;
+}
+
+analyzer.ClassElement _elementFor<T>(analyzer.LibraryElement rootLibrary) {
+  var mirror = reflectType(T);
+  var libUri = normalizeUrl((mirror.owner as LibraryMirror).uri);
+  var library = _findLibByUri(rootLibrary, libUri)!;
+  var searchName = mirror.simpleName.toString();
+  searchName = searchName.replaceFirst('Symbol("', '').replaceFirst('")', '');
+  return library.topLevelElements.firstWhere((e) => e.name == searchName)
+      as analyzer.ClassElement;
+}
+
+analyzer.LibraryElement? _findLibByUri(
+    analyzer.LibraryElement root, Uri searchFor,
+    {Set<Uri>? checked}) {
+  checked ??= {};
+  if (normalizeUrl(root.source.uri) == searchFor) return root;
+  for (var import in root.importedLibraries) {
+    if (!checked.add(import.source.uri)) continue;
+    var lib = _findLibByUri(import, searchFor, checked: checked);
+    if (lib != null) return lib;
+  }
+  return null;
 }
