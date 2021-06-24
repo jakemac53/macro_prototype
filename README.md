@@ -13,6 +13,12 @@ This phases approach allows us to provide consistent, correct results for the
 introspection apis that are available, while simultaneously providing a lot
 of power in the form of adding entirely new declarations to the program.
 
+## API Docs
+
+The api docs can be seen [here](https://jakemac53.github.io/macro_prototype/doc/api/index.html).
+
+These are generated and published manually so they may become a bit stale.
+
 ## Evaluation Guidelines
 
 This prototype **is not** intended to reflect the final dev experience.
