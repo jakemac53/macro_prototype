@@ -17,7 +17,9 @@ of power in the form of adding entirely new declarations to the program.
 
 The api docs can be seen [here](https://jakemac53.github.io/macro_prototype/doc/api/index.html).
 
-These are generated and published manually so they may become a bit stale.
+These are generated and published manually so they may become a bit stale, you
+can regenerate them by checking out the `gh-pages` branch, running `dartdoc`
+from the root of the repo, and sending a pull request to that branch.
 
 ## Evaluation Guidelines
 
