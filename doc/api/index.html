@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="generator" content="made with love by dartdoc 0.45.0">
+  <meta name="description" content="macro_builder API docs, for the Dart programming language.">
+  <title>macro_builder - Dart API docs</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <link rel="stylesheet" href="static-assets/github.css?v1">
+  <link rel="stylesheet" href="static-assets/styles.css?v1">
+  <link rel="icon" href="static-assets/favicon.png?v1">
+
+  
+</head>
+
+
+<body data-base-href=""
+      data-using-base-href="false">
+
+<div id="overlay-under-drawer"></div>
+
+<header id="title">
+  <button id="sidenav-left-toggle" type="button">&nbsp;</button>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li class="self-crumb">macro_builder package</li>
+  </ol>
+  <div class="self-name">macro_builder</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+
+<main>
+
+
+  <div id="dartdoc-main-content" class="main-content">
+      
+<section class="desc markdown">
+  <h2 id="description">Description</h2>
+<p>This is a basic prototype for 3 phase macros using package:build.</p>
+<p>The general idea is that macros run in 3 different phases, and each phase has
+different capabilities available to it in terms of both introspection and code
+generation power.</p>
+<p>Macros are applied as annotations on declarations. They are currently supported
+on classes, methods, and fields.</p>
+<p>This phases approach allows us to provide consistent, correct results for the
+introspection apis that are available, while simultaneously providing a lot
+of power in the form of adding entirely new declarations to the program.</p>
+<h2 id="evaluation-guidelines">Evaluation Guidelines</h2>
+<p>This prototype <strong>is not</strong> intended to reflect the final dev experience.
+Specifically, the IDE and codegen experience you see here is not a
+reflection of the final expected product. The actual feature would be built
+into the compilation pipelines you already use, and you would not see any
+generated files in your source directory.</p>
+<p>We would like feedback focused on any other area though, such as:</p>
+<ul>
+<li>Does this provide enough functionality for you to do everything you want to?</li>
+<li>General feedback on the macro apis (anything exported by
+<code>lib/definition.dart</code>).</li>
+<li>General feedback on the multi-phased approach.</li>
+<li>Any other feedback unrelated to build_runner or the specific code generation
+process used in this prototype.</li>
+</ul>
+<p>Note that if  you do implement some macros, we would love for you to contribute
+them to the repo so we have more concrete examples of the use cases!</p>
+<h2 id="intro-to-the-macro-interfaces">Intro to the Macro interfaces</h2>
+<p>Each type of macro has it's own interface, each of which have a single method
+that you must implement. These methods each take two arguments, the first
+argument is the object you use to introspect on the object that was annotated
+with the macro, and the second argument is a builder object used to modify the
+program.</p>
+<p>For example, lets take a look at the <code>ClassDeclarationMacro</code> interface:</p>
+<pre class="language-dart"><code class="language-dart">/// The interface for [DeclarationMacro]s that can be applied to classes.
+abstract class ClassDeclarationMacro implements DeclarationMacro {
+  void visitClassDeclaration(
+      ClassDeclaration declaration, ClassDeclarationBuilder builder);
+}
+</code></pre>
+<p>This macro is given a <code>ClassDeclaration</code> object as the first argument, which
+gives you all the reflective information available for a class, in the
+"declaration" phase (phase 2).</p>
+<p>The second argument is a <code>ClassDeclarationBuilder</code>, which has an
+<code>addToClass(Declaration declaration)</code> method you can use to add new
+declarations to the class. A <code>ClassDeclarationBuilder</code> is also a
+<code>DeclarationBuilder</code>, which gives you the ability to add top level declarations
+with the <code>addToLibrary(Declaration declaration)</code> method.</p>
+<h3 id="implementing-multiple-macro-interfaces">Implementing Multiple Macro Interfaces</h3>
+<p>A single macro class is allowed to implement multiple macro interfaces, which
+allows it to run in several phases. As an example of this you can look at the
+<code>example/macros/json.dart</code> macro, which implements three different macro
+interfaces. First, is the <code>ClassDeclarationMacro</code>, which it uses to define the
+interface only of the <code>fromJson</code> constructor and <code>toJson</code> methods.</p>
+<p>It then also implements the <code>ConstructorDefinitionMacro</code> and
+<code>MethodDefinitionMacro</code> interfaces which it uses to fill in those declarations
+with the full implementations.</p>
+<p>Note that a macro can provide a full definition in the declaration phase, but
+the json macro needs more reflective information than is available to it in
+that phase, so it waits until the later phase where it can fully introspect
+on the program to fill in the implementations.</p>
+<h3 id="phase-1---type-macros">Phase 1 - Type Macros</h3>
+<p>These macros have almost no introspection capability, but are allowed to
+introduce entirely new classes to the application.</p>
+<p>To make a macro run in this phase you should implement either <code>ClassTypeMacro</code>,
+<code>FieldTypeMacro</code>, or <code>MethodTypeMacro</code>, depending on which type of declaration
+your macro supports running on.</p>
+<h3 id="phase-2---declaration-macros">Phase 2 - Declaration Macros</h3>
+<p>These macros can introspect on the declaration they annotate, but cannot
+recursively introspect on the types referenced in those declarations. They are
+however allowed to ask questions about type relationships for any types they
+see, through the <code>isSubtypeOf</code> api.</p>
+<p>These macros are allowed to introduce new public declarations to classes, as
+well as the current library, but not new types.</p>
+<p>To make a macro run in this phase you should implement either
+<code>ClassDeclarationMacro</code>, <code>FieldDeclarationMacro</code>, or <code>MethodDeclarationMacro</code>,
+depending on which type of declaration your macro supports running on.</p>
+<h3 id="phase-3---definition-macros">Phase 3 - Definition Macros</h3>
+<p>These macros can introspect fully on the declaration they annotate, including
+recursively introspecting on the types referenced in those declarations.</p>
+<p>In exchange for this introspection power, these macros are only allowed to
+implement existing declarations. No new declarations can be added in this phase,
+so the static shape of the program is fully complete before these macros run.</p>
+<p>To make a macro run in this phase you should implement either
+<code>ClassDefinitionMacro</code>, <code>FieldDefinitionMacro</code>, or <code>MethodDefinitionMacro</code>,
+depending on which type of declaration your macro supports running on.</p>
+<h2 id="example-macros-wiring-up-a-new-macro">Example Macros, Wiring Up a New Macro</h2>
+<h3 id="vm-example">VM example</h3>
+<p>You can see some examples under <code>example/macros</code>.</p>
+<p>Once you create a macro you will need to add it to all the phases in which it
+should run, see the <code>typesBuilder</code>, <code>declarationsBuilder</code>, and
+<code>definitionsBuilder</code> methods in <code>example/builders.dart</code>, and pass in your new
+macro to the corresponding constructor for the phase in which it should run.</p>
+<h3 id="flutter-example">Flutter example</h3>
+<p>You can see flutter examples under <code>flutter_example/macros</code>.</p>
+<p>Once you create a macro you will need to add it to all the phases in which it
+should run, see the <code>typesBuilder</code>, <code>declarationsBuilder</code>, and
+<code>definitionsBuilder</code> methods in <code>flutter_example/lib/builders.dart</code>, and pass
+in your new macro to the corresponding constructor for the phase in which it
+should run.</p>
+<h2 id="using-a-macro">Using a Macro</h2>
+<p>For this prototype you need to create your example files that use your macros
+with the extension <code>.gen.dart</code>. We will run codegen on only those files,
+applying the macros and generating a file for the output at each phase.</p>
+<p>The final phase will create a regular <code>.dart</code> file which is what you should
+import. If you want to import other files which also use codegen, you should do
+so by importing the <code>.gen.dart</code> files, this will ensure they are visible to the
+build of your library (and only the appropriate info should be available).</p>
+<h2 id="running-macros">Running macros</h2>
+<p>You will use the build_runner package to run builds, which you can run with the
+<code>pub run build_runner build</code> (or <code>flutter pub run build_runner build</code>) command.
+There is also a <code>watch</code> command you may want to use to get fast rebuilds.</p>
+<p>For vm apps if you want to build and run an app in a single command, you can
+use the <code>run</code> command: <code>pub run build_runner run example/main.dart</code>.</p>
+<p>For flutter apps you will need to run build_runner separately, and then launch
+the flutter app as normal.</p>
+</section>
+
+
+      <section class="summary">
+          <h2>Libraries</h2>
+        <dl>
+          <dt id="builder">
+  <span class="name"><a href="builder/builder-library.html">builder</a></span> 
+
+</dt>
+<dd> 
+</dd>
+
+          <dt id="definition">
+  <span class="name"><a href="definition/definition-library.html">definition</a></span> 
+
+</dt>
+<dd> 
+</dd>
+
+        </dl>
+      </section>
+
+  </div> <!-- /.main-content -->
+
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+  <li class="self-crumb">macro_builder package</li>
+</ol>
+
+
+    <h5 class="hidden-xs"><span class="package-name">macro_builder</span> <span class="package-kind">package</span></h5>
+    <ol>
+      <li class="section-title">Libraries</li>
+      <li><a href="builder/builder-library.html">builder</a></li>
+      <li><a href="definition/definition-library.html">definition</a></li>
+</ol>
+
+  </div>
+
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div>
+
+</main>
+
+<footer>
+  <span class="no-break">
+    macro_builder
+      0.0.0-unknown
+  </span>
+
+  
+</footer>
+
+
+
+<script src="static-assets/highlight.pack.js?v1"></script>
+<script src="static-assets/script.js?v1"></script>
+
+
+
+</body>
+
+</html>
+
