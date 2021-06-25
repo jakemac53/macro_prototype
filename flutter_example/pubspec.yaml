@@ -28,6 +28,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   build: ^2.0.0
+  riverpod: any
   flutter:
     sdk: flutter
 
