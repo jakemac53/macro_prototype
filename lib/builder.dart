@@ -96,45 +96,62 @@ abstract class _MacroBuilder extends Builder {
     implementedDecls ??= [];
     if (element is analyzer.ClassElement) {
       var classBuffer = StringBuffer();
-      var clazz = (await resolver.astNodeFor(element, resolve: true))
-          as analyzer.ClassDeclaration;
-      var start = clazz.offset;
-      var end = clazz.leftBracket.charOffset;
-      classBuffer.writeln(originalSource.substring(start, end + 1));
+      var clazz = (await resolver.astNodeFor(element, resolve: true));
+      if (clazz is analyzer.ClassOrMixinDeclaration) {
+        var start = clazz.offset;
+        var end = clazz.leftBracket.charOffset;
+        classBuffer.writeln(originalSource.substring(start, end + 1));
 
-      for (var checker in macros.keys) {
-        implementedDecls.addAll(await maybeApplyMacro(
-                checker,
-                macros[checker]!,
-                element,
-                resolver,
-                classBuffer,
-                libraryBuffer,
-                originalSource) ??
-            const []);
+        for (var checker in macros.keys) {
+          implementedDecls.addAll(await maybeApplyMacro(
+                  checker,
+                  macros[checker]!,
+                  element,
+                  resolver,
+                  classBuffer,
+                  libraryBuffer,
+                  originalSource) ??
+              const []);
+        }
+        for (var field in element.fields) {
+          await _applyMacros(
+              field, classBuffer, libraryBuffer, resolver, originalSource,
+              implementedDecls: implementedDecls);
+        }
+        for (var method in element.methods) {
+          await _applyMacros(
+              method, classBuffer, libraryBuffer, resolver, originalSource,
+              implementedDecls: implementedDecls);
+        }
+        for (var constructor in element.constructors) {
+          await _applyMacros(
+              constructor, classBuffer, libraryBuffer, resolver, originalSource,
+              implementedDecls: implementedDecls);
+        }
+        for (var accessor in element.accessors) {
+          await _applyMacros(
+              accessor, classBuffer, libraryBuffer, resolver, originalSource,
+              implementedDecls: implementedDecls);
+        }
+        classBuffer.writeln('}');
+        buffer.writeln(classBuffer);
+      } else if (clazz is analyzer.EnumDeclaration) {
+        var start = clazz.offset;
+        var end = clazz.leftBracket.charOffset;
+        classBuffer.writeln(originalSource.substring(start, end + 1));
+
+        for (var checker in macros.keys) {
+          implementedDecls.addAll(await maybeApplyMacro(
+                  checker,
+                  macros[checker]!,
+                  element,
+                  resolver,
+                  classBuffer,
+                  libraryBuffer,
+                  originalSource) ??
+              const []);
+        }
       }
-      for (var field in element.fields) {
-        await _applyMacros(
-            field, classBuffer, libraryBuffer, resolver, originalSource,
-            implementedDecls: implementedDecls);
-      }
-      for (var method in element.methods) {
-        await _applyMacros(
-            method, classBuffer, libraryBuffer, resolver, originalSource,
-            implementedDecls: implementedDecls);
-      }
-      for (var constructor in element.constructors) {
-        await _applyMacros(
-            constructor, classBuffer, libraryBuffer, resolver, originalSource,
-            implementedDecls: implementedDecls);
-      }
-      for (var accessor in element.accessors) {
-        await _applyMacros(
-            accessor, classBuffer, libraryBuffer, resolver, originalSource,
-            implementedDecls: implementedDecls);
-      }
-      classBuffer.writeln('}');
-      buffer.writeln(classBuffer);
     } else {
       var memberBuffer = StringBuffer();
       for (var checker in macros.keys) {
@@ -152,6 +169,8 @@ abstract class _MacroBuilder extends Builder {
       if (implementedDecls.contains(element.name!) != true) {
         var node = (await resolver.astNodeFor(element, resolve: true))!;
         if (element is analyzer.FieldElement) {
+          node = node.parent!.parent!;
+        } else if (element is analyzer.TopLevelVariableElement) {
           node = node.parent!.parent!;
         }
         buffer.writeln(node.toSource());
@@ -395,7 +414,10 @@ void _checkValidMacroApplication(analyzer.Element element, Macro macro) {
       element is analyzer.ConstructorElement) {
     if (macro is! MethodTypeMacro &&
         macro is! MethodDeclarationMacro &&
-        macro is! MethodDefinitionMacro) {
+        macro is! MethodDefinitionMacro &&
+        macro is! ConstructorTypeMacro &&
+        macro is! ConstructorDeclarationMacro &&
+        macro is! MethodDeclarationMacro) {
       throw ArgumentError(
           'Macro $macro does not support running on methods or constructors, '
           'but was found on $element');
