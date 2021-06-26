@@ -151,6 +151,14 @@ abstract class _MacroBuilder extends Builder {
                   originalSource) ??
               const []);
         }
+        for (var enumValue in clazz.constants) {
+          await _applyMacros(enumValue.declaredElement!, classBuffer,
+              libraryBuffer, resolver, originalSource,
+              implementedDecls: implementedDecls);
+          classBuffer.write(',');
+        }
+        classBuffer.writeln('}');
+        buffer.writeln(classBuffer);
       }
     } else {
       var memberBuffer = StringBuffer();
@@ -168,7 +176,7 @@ abstract class _MacroBuilder extends Builder {
 
       if (implementedDecls.contains(element.name!) != true) {
         var node = (await resolver.astNodeFor(element, resolve: true))!;
-        if (element is analyzer.FieldElement) {
+        if (element is analyzer.FieldElement && !element.isEnumConstant) {
           node = node.parent!.parent!;
         } else if (element is analyzer.TopLevelVariableElement) {
           node = node.parent!.parent!;
