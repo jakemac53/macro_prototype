@@ -425,7 +425,7 @@ void _checkValidMacroApplication(analyzer.Element element, Macro macro) {
         macro is! MethodDefinitionMacro &&
         macro is! ConstructorTypeMacro &&
         macro is! ConstructorDeclarationMacro &&
-        macro is! MethodDeclarationMacro) {
+        macro is! ConstructorDefinitionMacro) {
       throw ArgumentError(
           'Macro $macro does not support running on methods or constructors, '
           'but was found on $element');
