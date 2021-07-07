@@ -189,21 +189,23 @@ abstract class ConstructorDefinitionBuilder implements DefinitionBuilder {
   /// You can conceptually think of the wrapping as implemented like this when
   /// understanding the semantics:
   ///
-  ///   void someFunction(int x) {
-  ///     void originalFn(int x) {
-  ///       // Copy the original function body here
-  ///     }
-  ///
-  ///     // Inject all [before] code here.
-  ///
-  ///     // Call function matching the original, capture the return value to
-  ///     // return later. Note that [ret] should not be available to [after].
-  ///     var ret = originalFn(x);
-  ///
-  ///     // Inject all [after] code here.
-  ///
-  ///     return ret; // Return the original return value
+  /// ```dart
+  /// void someFunction(int x) {
+  ///   void originalFn(int x) {
+  ///     // Copy the original function body here
   ///   }
+  ///
+  ///   // Inject all [before] code here.
+  ///
+  ///   // Call function matching the original, capture the return value to
+  ///   // return later. Note that [ret] should not be available to [after].
+  ///   var ret = originalFn(x);
+  ///
+  ///   // Inject all [after] code here.
+  ///
+  ///   return ret; // Return the original return value
+  /// }
+  /// ```
   ///
   /// Note that this means [before] can modify parameters before they are
   /// passed into the original function.
@@ -231,21 +233,23 @@ abstract class FunctionDefinitionBuilder implements DefinitionBuilder {
   /// You can conceptually think of the wrapping as implemented like this when
   /// understanding the semantics:
   ///
-  ///   void someFunction(int x) {
-  ///     void originalFn(int x) {
-  ///       // Copy the original function body here
-  ///     }
-  ///
-  ///     // Inject all [before] code here.
-  ///
-  ///     // Call function matching the original, capture the return value to
-  ///     // return later. Note that [ret] should not be available to [after].
-  ///     var ret = originalFn(x);
-  ///
-  ///     // Inject all [after] code here.
-  ///
-  ///     return ret; // Return the original return value
+  /// ```dart
+  /// void someFunction(int x) {
+  ///   void originalFn(int x) {
+  ///     // Copy the original function body here
   ///   }
+  ///
+  ///   // Inject all [before] code here.
+  ///
+  ///   // Call function matching the original, capture the return value to
+  ///   // return later. Note that [ret] should not be available to [after].
+  ///   var ret = originalFn(x);
+  ///
+  ///   // Inject all [after] code here.
+  ///
+  ///   return ret; // Return the original return value
+  /// }
+  /// ```
   ///
   /// Note that this means [before] can modify parameters before they are
   /// passed into the original function.
