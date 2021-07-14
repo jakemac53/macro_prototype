@@ -91,15 +91,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
-
-dependency_overrides:
-  analyzer:
-    git:
-      ref: fix-source-visitor
-      url: https://github.com/jakemac53/sdk.git
-      path: pkg/analyzer
-  meta:
-    git:
-      ref: fix-source-visitor
-      url: https://github.com/jakemac53/sdk.git
-      path: pkg/meta
