@@ -4,34 +4,14 @@
 // `lib/main.types.dart` file:
 //
 //   - Instance of '_AutoDisposeMacro'
+//   - Instance of 'RenderAccessors'
 //
 // To make changes you should edit the `lib/main.gen.dart` file;
 
 import 'package:flutter/material.dart';
 import 'macros/auto_dispose.dart';
 import 'macros/functional_widget.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-@FunctionalWidget(widgetName: 'MyApp')
-Widget _buildApp(BuildContext context,
-    {String? appTitle, String? homePageTitle}) {
-  return MaterialApp(
-      title: appTitle ?? 'Flutter Demo',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: MyHomePage(title: homePageTitle ?? 'Flutter Demo Home Page'));
-}
-
-class MyApp extends StatelessWidget {
-  final String? appTitle;
-  final String? homePageTitle;
-  @override
-  Widget build(BuildContext context) =>
-      _buildApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
-  const MyApp({this.appTitle, this.homePageTitle, Key? key}) : super(key: key);
-}
+import 'macros/render_accessors.dart';
 
 class MyHomePage extends StatefulWidget {
   final String title;
@@ -43,6 +23,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final disposable = SimpleDisposable();
   int _counter = 0;
+  Color _color = Colors.blue;
   void _incrementCounter() {
     setState(() {
       _counter++;
@@ -58,7 +39,17 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
               const Text('You have pushed the button this many times:'),
-              Text('$_counter', style: Theme.of(context).textTheme.headline4)
+              Text('$_counter', style: Theme.of(context).textTheme.headline4),
+              GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _color = _color == Colors.blue ? Colors.red : Colors.blue;
+                    });
+                  },
+                  child: SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: MyColoredFill(color: _color)))
             ])),
         floatingActionButton: FloatingActionButton(
             onPressed: _incrementCounter,
@@ -78,4 +69,71 @@ class SimpleDisposable implements Disposable {
   void dispose() {
     print('disposing $this');
   }
+}
+
+class MyColoredFill extends LeafRenderObjectWidget {
+  final Color color;
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return MyColoredFillRenderBox(color: color);
+  }
+
+  @override
+  void updateRenderObject(
+      BuildContext context, MyColoredFillRenderBox renderObject) {
+    renderObject.color = color;
+  }
+
+  const MyColoredFill({Key? key, required this.color}) : super(key: key);
+}
+
+class MyColoredFillRenderBox extends RenderBox {
+  @RenderAccessors(needsPaint: true)
+  Color _color;
+  Color get color => _color;
+  set color(Color value) {
+    if (value == _color) {
+      return;
+    }
+    _color = value;
+    markNeedsPaint();
+  }
+
+  @override
+  bool hitTestSelf(Offset position) => true;
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    return constraints.biggest;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    context.canvas.drawRect(offset & size, Paint()..color = color);
+  }
+
+  MyColoredFillRenderBox({required Color color}) : _color = color;
+  @override
+  bool get sizedByParent => true;
+}
+
+class MyApp extends StatelessWidget {
+  final String? appTitle;
+  final String? homePageTitle;
+  @override
+  Widget build(BuildContext context) =>
+      _buildApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
+  const MyApp({this.appTitle, this.homePageTitle, Key? key}) : super(key: key);
+}
+
+void main() {
+  runApp(const MyApp());
+}
+
+@FunctionalWidget(widgetName: 'MyApp')
+Widget _buildApp(BuildContext context,
+    {String? appTitle, String? homePageTitle}) {
+  return MaterialApp(
+      title: appTitle ?? 'Flutter Demo',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: MyHomePage(title: homePageTitle ?? 'Flutter Demo Home Page'));
 }
