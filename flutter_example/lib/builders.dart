@@ -6,5 +6,6 @@ import 'macros/functional_widget.dart';
 import 'macros/render_accessors.dart';
 
 Builder typesBuilder(_) => TypesMacroBuilder([widget]);
-Builder declarationsBuilder(_) => DeclarationsMacroBuilder([autoDispose, const RenderAccessors()]);
+Builder declarationsBuilder(_) =>
+    DeclarationsMacroBuilder([autoDispose, const RenderAccessors()]);
 Builder definitionsBuilder(_) => DefinitionsMacroBuilder([autoDispose]);

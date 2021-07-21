@@ -105,7 +105,8 @@ class MyColoredFill extends LeafRenderObjectWidget {
   }
 
   @override
-  void updateRenderObject(BuildContext context,  MyColoredFillRenderBox renderObject) {
+  void updateRenderObject(
+      BuildContext context, MyColoredFillRenderBox renderObject) {
     renderObject.color = color;
   }
 }
@@ -113,7 +114,8 @@ class MyColoredFill extends LeafRenderObjectWidget {
 class MyColoredFillRenderBox extends RenderBox {
   MyColoredFillRenderBox({required Color color}) : _color = color;
 
-  @RenderAccessors(needsPaint: true) Color _color;
+  @RenderAccessors(needsPaint: true)
+  Color _color;
 
   @override
   bool get sizedByParent => true;

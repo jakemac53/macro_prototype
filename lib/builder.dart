@@ -533,7 +533,9 @@ ${_definition.type.toCode()} ${_definition.name} = $body;''');
     if (!_definition.isAbstract && !_definition.isExternal) {
       throw 'Cannot implement non-abstract or external field $_definition';
     }
-    _buffer..writeln(getter)..writeln(setter);
+    _buffer
+      ..writeln(getter)
+      ..writeln(setter);
     supportingDeclarations?.forEach(_buffer.writeln);
   }
 }

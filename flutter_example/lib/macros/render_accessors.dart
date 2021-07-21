@@ -26,7 +26,6 @@ class RenderAccessors implements FieldDeclarationMacro {
     String publicName = privateName.substring(1);
     String type = declaration.type.toCode();
 
-
     // Getter
     builder.addToClass(Declaration('$type get $publicName => $privateName;'));
 
