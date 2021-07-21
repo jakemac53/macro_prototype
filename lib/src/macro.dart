@@ -50,6 +50,12 @@ abstract class ClassDeclarationMacro implements DeclarationMacro {
       ClassDeclaration declaration, ClassDeclarationBuilder builder);
 }
 
+/// The interface for [DefinitionMacro]s that can be applied to classes.
+abstract class ClassDefinitionMacro implements DefinitionMacro {
+  void visitClassDefinition(
+      ClassDefinition declaration, ClassDefinitionBuilder builder);
+}
+
 /// The interface for [TypeMacro]s that can be applied to fields.
 abstract class FieldTypeMacro implements TypeMacro {
   void visitFieldType(FieldType type, TypeBuilder builder);
@@ -271,4 +277,17 @@ abstract class FieldDefinitionBuilder implements DefinitionBuilder {
   /// field.
   void withGetterSetterPair(Declaration getter, Declaration setter,
       {List<Code>? supportingDeclarations});
+}
+
+/// Api used by [DefinitionMacros] that want to annotate classes and retrieve
+/// builders for any declaration within the class.
+///
+/// This allows a macro to exist on a class, but manipulate multiple
+/// declarations within the class.
+abstract class ClassDefinitionBuilder implements DefinitionBuilder {
+  ConstructorDefinitionBuilder constructorBuilder(String name);
+
+  FieldDefinitionBuilder fieldBuilder(String name);
+
+  FunctionDefinitionBuilder methodBuilder(String name);
 }

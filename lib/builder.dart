@@ -317,7 +317,11 @@ class DefinitionsMacroBuilder extends _MacroBuilder {
     if (!checker.hasAnnotationOf(element)) return null;
     _checkValidMacroApplication(element, macro);
     macro = _instantiateFromMeta(macro, checker.firstAnnotationOf(element)!);
-    if (element is analyzer.FieldElement && macro is FieldDefinitionMacro) {
+    if (element is analyzer.ClassElement && macro is ClassDefinitionMacro) {
+      throw UnsupportedError(
+          'ClassDefinitionMacros are not supported in this prototype');
+    } else if (element is analyzer.FieldElement &&
+        macro is FieldDefinitionMacro) {
       var fieldBuffer = StringBuffer();
       var parentClass = element.enclosingElement as analyzer.ClassElement;
       var definition =
