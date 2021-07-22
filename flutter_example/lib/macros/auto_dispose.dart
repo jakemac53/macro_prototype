@@ -35,7 +35,7 @@ external void dispose();
     var disposeCalls = <Statement>[];
     for (var field in definition.definingClass.fields) {
       var type = field.type;
-      if (type is! ClassDefinition) continue;
+      if (type is! ClassDeclaration) continue;
       if (!type.isSubtype(disposable)) continue;
       disposeCalls.add(Statement('${field.name}.dispose();'));
     }

@@ -24,7 +24,7 @@ abstract class ClassDefinition implements TypeDefinition, ClassDeclaration {
   ClassDefinition? get superclass;
 
   @override
-  Iterable<TypeDefinition> get superinterfaces;
+  Iterable<TypeDeclaration> get superinterfaces;
 }
 
 /// Function introspection information for [DefinitionMacro]s.
