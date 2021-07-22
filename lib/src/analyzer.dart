@@ -398,7 +398,7 @@ class AnalyzerFunctionDeclaration extends _AnalyzerFunctionDeclaration {
 }
 
 class AnalyzerMethodType extends _AnalyzerFunctionDeclaration
-    implements MethodDeclaration {
+    implements MethodType {
   @override
   final analyzer.ExecutableElement element;
   AnalyzerMethodType(this.element);
@@ -418,9 +418,9 @@ class AnalyzerMethodDeclaration extends _AnalyzerFunctionDeclaration
   AnalyzerMethodDeclaration(this.element);
 
   @override
-  TypeReference get definingClass {
+  ClassType get definingClass {
     var clazz = element.enclosingElement as analyzer.ClassElement;
-    return AnalyzerTypeReference(clazz, originalReference: clazz.thisType);
+    return AnalyzerClassType(clazz, originalReference: clazz.thisType);
   }
 }
 
@@ -536,6 +536,13 @@ class AnalyzerConstructorDeclaration extends AnalyzerConstructorType
     implements ConstructorDeclaration {
   AnalyzerConstructorDeclaration(analyzer.ConstructorElement element)
       : super(element);
+
+  @override
+  ClassType get definingClass {
+    var clazz = element.enclosingElement;
+    return AnalyzerClassType(clazz, originalReference: clazz.thisType);
+  }
+
   @override
   Map<String, ParameterDeclaration> get namedParameters => {
         for (var param in element.parameters)
@@ -609,6 +616,12 @@ class AnalyzerFieldDeclaration implements FieldDeclaration {
   AnalyzerFieldDeclaration(this.element);
 
   @override
+  ClassType get definingClass {
+    var clazz = element.enclosingElement as analyzer.ClassElement;
+    return AnalyzerClassType(clazz, originalReference: clazz.thisType);
+  }
+
+  @override
   bool get isAbstract => element.isAbstract;
 
   @override
@@ -633,10 +646,8 @@ class AnalyzerFieldDefinition extends AnalyzerFieldDeclaration
         super(element);
 
   @override
-  ClassDefinition? get definingClass => _parentClass == null
-      ? null
-      : AnalyzerClassDefinition(_parentClass!,
-          originalReference: _parentClass!.thisType);
+  ClassDeclaration get definingClass => AnalyzerClassDeclaration(_parentClass!,
+      originalReference: _parentClass!.thisType);
 
   @override
   TypeDefinition get type => AnalyzerTypeDefinition(

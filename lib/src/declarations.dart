@@ -42,7 +42,10 @@ abstract class FunctionDeclaration implements FunctionType {
 }
 
 /// Method introspection information for [DeclarationMacro]s.
-abstract class MethodDeclaration implements FunctionDeclaration, MethodType {}
+abstract class MethodDeclaration implements FunctionDeclaration, MethodType {
+  @override
+  ClassType get definingClass;
+}
 
 /// Constructor introspection information for [DeclarationMacro]s.
 abstract class ConstructorDeclaration
@@ -52,6 +55,9 @@ abstract class ConstructorDeclaration
 abstract class FieldDeclaration implements FieldType {
   @override
   TypeDeclaration get type;
+
+  @override
+  ClassType get definingClass;
 }
 
 /// Parameter introspection information for [DeclarationMacro]s.

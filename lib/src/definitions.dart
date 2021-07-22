@@ -46,7 +46,7 @@ abstract class FunctionDefinition implements FunctionDeclaration {
 abstract class MethodDefinition
     implements FunctionDefinition, MethodDeclaration {
   @override
-  ClassDefinition get definingClass;
+  ClassDeclaration get definingClass;
 }
 
 /// Constructor introspection information for [DefinitionMacro]s.
@@ -55,7 +55,8 @@ abstract class ConstructorDefinition
 
 /// Field introspection information for [DefinitionMacro]s.
 abstract class FieldDefinition implements FieldDeclaration {
-  ClassDefinition? get definingClass;
+  @override
+  ClassDeclaration get definingClass;
 
   @override
   TypeDefinition get type;

@@ -67,6 +67,8 @@ abstract class ConstructorType implements MethodType {
 /// Field introspection information for [TypeMacro]s.
 abstract class FieldType implements DeclarationType {
   TypeReference get type;
+
+  TypeReference get definingClass;
 }
 
 /// Parameter introspection information for [TypeMacro]s.
