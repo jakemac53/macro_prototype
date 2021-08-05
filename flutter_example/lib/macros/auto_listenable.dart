@@ -54,12 +54,9 @@ external void didUpdateWidget(
 external void dispose();
 '''));
     } else {
-      // https://github.com/jakemac53/macro_prototype/issues/34, we comment
-      // this check out for now and manually add a macro application in the\
-      // user code.
-      //
-      // throw ArgumentError(
-      //     '@autoListenable isn\'t compatible with a custom `dispose` method.');
+      // https://github.com/jakemac53/macro_prototype/issues/34
+      throw ArgumentError(
+          '@autoListenable isn\'t compatible with a custom `dispose` method.');
     }
   }
 
