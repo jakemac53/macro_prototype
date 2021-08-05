@@ -4,29 +4,60 @@
 // `lib/main.declarations.dart` file:
 //
 //   - Instance of '_AutoDisposeMacro'
+//   - Instance of 'AutoListenable'
 //
 // To make changes you should edit the `lib/main.gen.dart` file;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'macros/auto_dispose.dart';
+import 'macros/auto_listenable.dart';
 import 'macros/functional_widget.dart';
 import 'macros/render_accessors.dart';
 
 class MyHomePage extends StatefulWidget {
+  final ValueNotifier<int> counter;
   final String title;
   @override
   State<MyHomePage> createState() => _MyHomePageState();
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
+  const MyHomePage(this.counter, {Key? key, required this.title})
+      : super(key: key);
 }
 
+@autoListenable
 class _MyHomePageState extends State<MyHomePage> {
-  final disposable = SimpleDisposable();
-  int _counter = 0;
   Color _color = Colors.blue;
+  @override
+  @autoListenable
+  void initState() {
+    super.initState();
+    widget.counter.addListener(_handleCounter);
+  }
+
+  @override
+  @autoListenable
+  void didUpdateWidget(
+    MyHomePage oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.counter != oldWidget.counter) {
+      oldWidget.counter.removeListener(_handleCounter);
+      widget.counter.addListener(_handleCounter);
+    }
+  }
+
+  @override
+  @autoListenable
+  void dispose() {
+    super.dispose();
+    widget.counter.removeListener(_handleCounter);
+  }
+
   void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+    widget.counter.value++;
+  }
+
+  void _handleCounter() {
+    setState(() {});
   }
 
   @override
@@ -38,7 +69,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
               const Text('You have pushed the button this many times:'),
-              Text('$_counter', style: Theme.of(context).textTheme.headline4),
+              Text('${widget.counter.value}',
+                  style: Theme.of(context).textTheme.headline4),
               GestureDetector(
                   onTap: () {
                     setState(() {
@@ -54,25 +86,6 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: _incrementCounter,
             tooltip: 'Increment',
             child: const Icon(Icons.add)));
-  }
-
-  @override
-  @autoDispose
-  void dispose() {
-    void $original() {
-      super.dispose();
-    }
-
-    disposable.dispose();
-    var $ret = $original();
-    return $ret;
-  }
-}
-
-class SimpleDisposable implements Disposable {
-  @override
-  void dispose() {
-    print('disposing $this');
   }
 }
 
@@ -122,23 +135,27 @@ class MyColoredFillRenderBox extends RenderBox {
 }
 
 class MyApp extends StatelessWidget {
+  final ValueNotifier<int> counter;
   final String? appTitle;
   final String? homePageTitle;
   @override
-  Widget build(BuildContext context) =>
-      _buildApp(context, appTitle: appTitle, homePageTitle: homePageTitle);
-  const MyApp({this.appTitle, this.homePageTitle, Key? key}) : super(key: key);
+  Widget build(BuildContext context) => _buildApp(context, counter,
+      appTitle: appTitle, homePageTitle: homePageTitle);
+  const MyApp(this.counter, {this.appTitle, this.homePageTitle, Key? key})
+      : super(key: key);
 }
 
 void main() {
-  runApp(const MyApp());
+  var counterNotifier = ValueNotifier<int>(0);
+  runApp(MyApp(counterNotifier));
 }
 
 @FunctionalWidget(widgetName: 'MyApp')
-Widget _buildApp(BuildContext context,
+Widget _buildApp(BuildContext context, ValueNotifier<int> counter,
     {String? appTitle, String? homePageTitle}) {
   return MaterialApp(
       title: appTitle ?? 'Flutter Demo',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: MyHomePage(title: homePageTitle ?? 'Flutter Demo Home Page'));
+      home: MyHomePage(counter,
+          title: homePageTitle ?? 'Flutter Demo Home Page'));
 }

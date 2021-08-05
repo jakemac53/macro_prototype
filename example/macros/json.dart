@@ -68,8 +68,7 @@ class _JsonMacro
       entries.add(Fragment(
           '  "${field.name}": ${_typeToJson(field.type, Fragment(field.name))}, '));
     }
-    var body =
-        FunctionBody.fromParts(['=> <String, Object?>{', ...entries, '};']);
+    var body = FunctionBody.fromParts(['=> <String, Object?>{', entries, '};']);
     builder.implement(body);
   }
 
