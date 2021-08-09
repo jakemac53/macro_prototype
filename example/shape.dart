@@ -7,11 +7,7 @@
 //
 // To make changes you should edit the `example/shape.gen.dart` file;
 
-import 'macros/data_class.dart';
 import 'macros/freezed.dart';
-import 'macros/json.dart';
-
-class Foo {}
 
 abstract class ShapeCircle extends Shape {
   @override
@@ -28,11 +24,14 @@ abstract class ShapeCircle extends Shape {
         debugLabel: json["debugLabel"] as String?);
   }
   double get radius;
+  @override
   String? get debugLabel;
 }
 
 class _$ShapeCircle extends ShapeCircle {
+  @override
   final double radius;
+  @override
   final String? debugLabel;
   @override
   R when<R>(
@@ -92,12 +91,16 @@ abstract class ShapeRectangle extends Shape {
   }
   double get width;
   double get height;
+  @override
   String? get debugLabel;
 }
 
 class _$ShapeRectangle extends ShapeRectangle {
+  @override
   final double width;
+  @override
   final double height;
+  @override
   final String? debugLabel;
   @override
   R when<R>(
@@ -147,6 +150,7 @@ abstract class Shape {
       {required R Function(double radius, String? debugLabel) circle,
       required R Function(double width, double height, String? debugLabel)
           rectangle});
+  Map<String, Object?> toJson();
   void prettyPrint() {
     when(
         circle: (radius, _) => print('when $debugLabel: Circle radius $radius'),

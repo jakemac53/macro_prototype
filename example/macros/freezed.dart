@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:macro_builder/definition.dart';
 
 const freezed = _Freezed();
@@ -81,6 +80,8 @@ R when<R>({
 factory ${declaration.name}.fromJson(Map<String, Object?> json) = ${redirectedName}.fromJson;
 ''');
     }
+
+    yield Declaration('Map<String, Object?> toJson();');
   }
 
   Iterable<_SharedParameter> _getSharedParameters(
@@ -105,8 +106,6 @@ factory ${declaration.name}.fromJson(Map<String, Object?> json) = ${redirectedNa
     ClassDeclaration declaration,
     ClassDeclarationBuilder builder,
   ) {
-    builder.addToLibrary(Declaration('class Foo {}'));
-
     // Assuming that the other constructors present are factory constructors
     // as we currently don't have the info
     // TODO why is declaration.constructors typed as List<MethodDeclaration> instead of List<ConstructorDeclaration>?
@@ -117,6 +116,8 @@ factory ${declaration.name}.fromJson(Map<String, Object?> json) = ${redirectedNa
       );
     }
 
+    final sharedParameters = _getSharedParameters(declaration).toList();
+
     _generateSharedDeclarations(declaration).forEach(builder.addToClass);
 
     for (final constructor in declaration.constructors) {
@@ -125,6 +126,7 @@ factory ${declaration.name}.fromJson(Map<String, Object?> json) = ${redirectedNa
           _UnionCaseTemplate(
             constructor: constructor,
             declaration: declaration,
+            sharedParameters: sharedParameters,
           ).toString(),
         ),
       );
@@ -133,6 +135,7 @@ factory ${declaration.name}.fromJson(Map<String, Object?> json) = ${redirectedNa
           _UnionCaseImplTemplate(
             constructor: constructor,
             declaration: declaration,
+            sharedParameters: sharedParameters,
           ).toString(),
         ),
       );
@@ -144,10 +147,12 @@ class _UnionCaseTemplate {
   _UnionCaseTemplate({
     required this.constructor,
     required this.declaration,
+    required this.sharedParameters,
   });
 
   final MethodDeclaration constructor;
   final ClassDeclaration declaration;
+  final List<_SharedParameter> sharedParameters;
 
   @override
   String toString() {
@@ -203,8 +208,10 @@ class _UnionCaseTemplate {
     );
 
     final properties = [
-      for (final parameter in constructor.allParameters)
+      for (final parameter in constructor.allParameters) ...[
+        if (sharedParameters.any((e) => e.name == parameter.name)) '@override ',
         '${parameter.type.reference.code} get ${parameter.name};'
+      ]
     ];
 
     // TODO support const constructors once we have a "constructor.isConst".
@@ -238,10 +245,12 @@ class _UnionCaseImplTemplate {
   _UnionCaseImplTemplate({
     required this.constructor,
     required this.declaration,
+    required this.sharedParameters,
   });
 
   final MethodDeclaration constructor;
   final ClassDeclaration declaration;
+  final List<_SharedParameter> sharedParameters;
 
   @override
   String toString() {
@@ -301,7 +310,7 @@ class _UnionCaseImplTemplate {
 
     final properties = [
       for (final parameter in constructor.allParameters)
-        'final ${parameter.type.reference.code} ${parameter.name};'
+        '@override final ${parameter.type.reference.code} ${parameter.name};'
     ];
 
     var when = '';

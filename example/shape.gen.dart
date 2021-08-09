@@ -1,6 +1,4 @@
-import 'macros/data_class.dart';
 import 'macros/freezed.dart';
-import 'macros/json.dart';
 
 @freezed
 abstract class Shape {
