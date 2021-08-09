@@ -101,11 +101,11 @@ class _CopyWith implements ClassDeclarationMacro {
     builder.addToClass(Declaration.fromParts([
       declaration.reference,
       Fragment(' copyWith({'),
-      namedParams,
+      Fragment.fromParts(namedParams, ', '),
       Fragment('})'),
       // TODO: We assume this constructor exists, but should check
       Fragment('=> ${declaration.reference}('),
-      args,
+      Fragment.fromParts(args, ', '),
       Fragment(');'),
     ]));
   }

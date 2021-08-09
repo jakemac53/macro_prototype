@@ -1,6 +1,6 @@
 import 'package:macro_builder/definition.dart';
 
-const widget = FunctionalWidget();
+const fwidget = FunctionalWidget();
 
 class FunctionalWidget implements FunctionTypeMacro {
   final String? widgetName;
@@ -40,7 +40,7 @@ class FunctionalWidget implements FunctionTypeMacro {
       Fragment('Key? key, }'),
     ];
     var constructor = Declaration.fromParts(
-        ['const $widgetName(', ...constructorArgs, ') : super(key: key);']);
+        ['const $widgetName(', constructorArgs, ') : super(key: key);']);
     var invocationArgs = <Code>[
       for (var param in positionalFieldParams) Fragment('${param.name}, '),
       for (var param in declaration.namedParameters.values)
@@ -51,13 +51,13 @@ class FunctionalWidget implements FunctionTypeMacro {
 @override
 Widget build(BuildContext context) =>
     ${declaration.name}(context, ''',
-      ...invocationArgs,
+      invocationArgs,
       ');',
     ]);
 
     builder.addTypeToLibary(Declaration.fromParts([
       'class $widgetName extends StatelessWidget {',
-      ...fields,
+      fields,
       constructor,
       buildMethod,
       '}',

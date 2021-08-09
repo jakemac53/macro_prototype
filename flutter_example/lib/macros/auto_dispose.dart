@@ -43,7 +43,7 @@ external void dispose();
     // prepend extra calls.
     if (definition.isAbstract || definition.isExternal) {
       builder.implement(FunctionBody.fromParts(
-          ['{', Statement('super.dispose();'), ...disposeCalls, '}']));
+          ['{', Statement('super.dispose();'), disposeCalls, '}']));
     } else {
       builder.wrapBody(before: disposeCalls);
     }

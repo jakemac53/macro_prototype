@@ -30,9 +30,9 @@ class Fragment extends Code {
   /// Creates a [Fragment] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Fragment.fromParts(List<Object> parts) =>
-      Fragment(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory Fragment.fromParts(List<Object> parts, [String separator = '']) =>
+      Fragment(_combineParts(parts, separator));
 }
 
 /// A piece of code representing a syntactically valid Declaration.
@@ -51,9 +51,9 @@ class Declaration extends Code {
   /// Creates a [Declaration] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Declaration.fromParts(List<Object> parts) =>
-      Declaration(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory Declaration.fromParts(List<Object> parts, [String separator = '']) =>
+      Declaration(_combineParts(parts, separator));
 }
 
 /// A piece of code representing a syntactically valid Element.
@@ -72,9 +72,9 @@ class Element extends Code {
   /// Creates a [Declaration] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Element.fromParts(List<Object> parts) =>
-      Element(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory Element.fromParts(List<Object> parts, [String separator = '']) =>
+      Element(_combineParts(parts, separator));
 }
 
 /// A piece of code representing a syntactically valid Expression.
@@ -95,9 +95,9 @@ class Expression extends Code {
   /// Creates an [Expression] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Expression.fromParts(List<Object> parts) =>
-      Expression(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory Expression.fromParts(List<Object> parts, [String separator = '']) =>
+      Expression(_combineParts(parts, separator));
 }
 
 /// A piece of code representing a syntactically valid function body.
@@ -125,9 +125,9 @@ class FunctionBody extends Code {
   /// Creates an [Expression] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory FunctionBody.fromParts(List<Object> parts) =>
-      FunctionBody(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory FunctionBody.fromParts(List<Object> parts, [String separator = '']) =>
+      FunctionBody(_combineParts(parts, separator));
 }
 
 /// A piece of code identifying a named argument.
@@ -148,9 +148,10 @@ class NamedArgument extends Code {
   /// Creates a [Parameter] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory NamedArgument.fromParts(List<Object> parts) =>
-      NamedArgument(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory NamedArgument.fromParts(List<Object> parts,
+          [String separator = '']) =>
+      NamedArgument(_combineParts(parts, separator));
 }
 
 /// A piece of code identifying a syntactically valid function parameter.
@@ -177,9 +178,9 @@ class Parameter extends Code {
   /// Creates a [Parameter] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Parameter.fromParts(List<Object> parts) =>
-      Parameter(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory Parameter.fromParts(List<Object> parts, [String separator = '']) =>
+      Parameter(_combineParts(parts, separator));
 }
 
 /// A piece of code representing a syntactically valid statement.
@@ -200,9 +201,9 @@ class Statement extends Code {
   /// Creates a [Statement] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory Statement.fromParts(List<Object> parts) =>
-      Statement(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory Statement.fromParts(List<Object> parts, [String separator = '']) =>
+      Statement(_combineParts(parts, separator));
 }
 
 /// A piece of code representing a syntactically valid type annotation.
@@ -225,9 +226,10 @@ class TypeAnnotation extends Code {
   /// Creates a [TypeAnnotation] from [parts], which must be of type [Code]
   /// [List<Code>] or [String].
   ///
-  /// When a [List<Code>] is encountered they are joined by a comma.
-  factory TypeAnnotation.fromParts(List<Object> parts) =>
-      TypeAnnotation(_combineParts(parts));
+  /// When a [List<Code>] is encountered they are joined by [separator].
+  factory TypeAnnotation.fromParts(List<Object> parts,
+          [String separator = '']) =>
+      TypeAnnotation(_combineParts(parts, separator));
 }
 
 final _featureSet = FeatureSet.latestLanguageVersion();
@@ -254,7 +256,7 @@ T _withParserAndToken<T>(
 
 /// Combines [parts] into a [String]. Must only contain [Code] or [String]
 /// instances.
-String _combineParts(List<Object> parts) {
+String _combineParts(List<Object> parts, [String separator = '']) {
   var buffer = StringBuffer();
   for (var part in parts) {
     if (part is String) {
@@ -262,7 +264,7 @@ String _combineParts(List<Object> parts) {
     } else if (part is Code) {
       buffer.write(part.code);
     } else if (part is List<Code>) {
-      buffer.write(part.map((p) => p.code).join(', '));
+      buffer.write(part.map((p) => p.code).join(separator));
     } else {
       throw UnsupportedError(
           'Only String, Code, and List<Code> are allowed but got $part');

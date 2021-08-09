@@ -1,24 +1,30 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'macros/auto_dispose.dart';
+import 'macros/auto_listenable.dart';
 import 'macros/functional_widget.dart';
 import 'macros/render_accessors.dart';
 
 void main() {
-  runApp(const MyApp());
+  var counterNotifier = ValueNotifier<int>(0);
+  runApp(MyApp(counterNotifier));
 }
 
 @FunctionalWidget(widgetName: 'MyApp')
-Widget _buildApp(BuildContext context,
+Widget _buildApp(BuildContext context, ValueNotifier<int> counter,
     {String? appTitle, String? homePageTitle}) {
   return MaterialApp(
       title: appTitle ?? 'Flutter Demo',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: MyHomePage(title: homePageTitle ?? 'Flutter Demo Home Page'));
+      home: MyHomePage(counter,
+          title: homePageTitle ?? 'Flutter Demo Home Page'));
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
+  final ValueNotifier<int> counter;
+
+  const MyHomePage(this.counter, {Key? key, required this.title})
+      : super(key: key);
 
   final String title;
 
@@ -26,15 +32,16 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+@autoListenable
 class _MyHomePageState extends State<MyHomePage> {
-  final disposable = SimpleDisposable();
-  int _counter = 0;
   Color _color = Colors.blue;
 
   void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+    widget.counter.value++;
+  }
+
+  void _handleCounter() {
+    setState(() { /* wiget.counter.value is used in the build method */});
   }
 
   @override
@@ -51,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
               'You have pushed the button this many times:',
             ),
             Text(
-              '$_counter',
+              '${widget.counter.value}',
               style: Theme.of(context).textTheme.headline4,
             ),
             GestureDetector(
@@ -77,19 +84,6 @@ class _MyHomePageState extends State<MyHomePage> {
         child: const Icon(Icons.add),
       ),
     );
-  }
-
-  @override
-  @autoDispose
-  void dispose() {
-    super.dispose();
-  }
-}
-
-class SimpleDisposable implements Disposable {
-  @override
-  void dispose() {
-    print('disposing $this');
   }
 }
 
