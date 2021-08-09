@@ -68,17 +68,27 @@ void main() {
   print('rectangle == decodedRectangle: ${rectangle == decodedRectangle}');
 
   print('Can define methods shared by all shapes:');
-  circle.prettyPrint();
-  rectangle.prettyPrint();
-  decodedCircle.prettyPrint();
-  decodedRectangle.prettyPrint();
+  print('circle.toPrettyString(): ${circle.toPrettyString()}');
+  print('rectangle.toPrettyString(): ${rectangle.toPrettyString()}');
+
+  print('\nswitch case on type:');
+  for (final shape in [circle, rectangle]) {
+    print(
+      shape.when(
+        circle: (radius, debugLabel) => 'shape is circle with radius $radius',
+        rectangle: (width, height, debugLabel) =>
+            'shape is rectange with width $width and height $height',
+      ),
+    );
+  }
+  print('');
 
   final fooCircle = circle.copyWith(debugLabel: 'foo');
-  print('copy `circle` with label "foo": $fooCircle');
+  print('circle.copyWith(debugLabel: "foo"): $fooCircle');
 
   final fooRectangle = rectangle.copyWith(debugLabel: 'foo');
-  print('copy `rectangle` with label "foo": $fooRectangle');
+  print('rectangle.copyWith(debugLabel: "foo"): $fooRectangle');
 
   final nullCircle = circle.copyWith(debugLabel: null);
-  print('copy `circle` with label null: $nullCircle');
+  print('circle.copyWith(debugLabel: null): $nullCircle');
 }

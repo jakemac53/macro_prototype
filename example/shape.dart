@@ -151,11 +151,11 @@ abstract class Shape {
       required R Function(double width, double height, String? debugLabel)
           rectangle});
   Map<String, Object?> toJson();
-  void prettyPrint() {
-    when(
-        circle: (radius, _) => print('when $debugLabel: Circle radius $radius'),
+  String toPrettyString() {
+    return when(
+        circle: (radius, _) => '$debugLabel: Circle radius $radius',
         rectangle: (width, height, _) =>
-            print('when $debugLabel: Rectangle width $width height $height'));
+            '$debugLabel: Rectangle width $width height $height');
   }
 
   Shape._();

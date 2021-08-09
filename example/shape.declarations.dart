@@ -185,11 +185,11 @@ abstract class Shape {
   });
 
   Map<String, Object?> toJson();
-  void prettyPrint() {
-    when(
-        circle: (radius, _) => print('when $debugLabel: Circle radius $radius'),
+  String toPrettyString() {
+    return when(
+        circle: (radius, _) => 'when $debugLabel: Circle radius $radius',
         rectangle: (width, height, _) =>
-            print('when $debugLabel: Rectangle width $width height $height'));
+            'when $debugLabel: Rectangle width $width height $height');
   }
 
   factory Shape.circle(double radius, {String? debugLabel}) = ShapeCircle;

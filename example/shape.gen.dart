@@ -10,12 +10,11 @@ abstract class Shape {
     String? debugLabel,
   }) = ShapeRectangle;
 
-  void prettyPrint() {
-    when(
-      circle: (radius, _) => print('when $debugLabel: Circle radius $radius'),
-      rectangle: (width, height, _) => print(
-        'when $debugLabel: Rectangle width $width height $height',
-      ),
+  String toPrettyString() {
+    return when(
+      circle: (radius, _) => 'when $debugLabel: Circle radius $radius',
+      rectangle: (width, height, _) =>
+          'when $debugLabel: Rectangle width $width height $height',
     );
   }
 }
