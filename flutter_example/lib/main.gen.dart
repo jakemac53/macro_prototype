@@ -41,7 +41,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _handleCounter() {
-    setState(() {});
+    setState(() { /* wiget.counter.value is used in the build method */});
   }
 
   @override

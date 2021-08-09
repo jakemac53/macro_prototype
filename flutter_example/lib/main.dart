@@ -48,8 +48,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   @autoListenable
   void dispose() {
-    super.dispose();
     widget.counter.removeListener(_handleCounter);
+    super.dispose();
   }
 
   void _incrementCounter() {

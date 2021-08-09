@@ -128,9 +128,7 @@ external void dispose();
 
   void _buildDispose(MethodDefinition definition, ClassDeclaration widgetClass,
       FunctionDefinitionBuilder builder) {
-    var parts = <Statement>[
-      Statement('super.dispose();'),
-    ];
+    var parts = <Statement>[];
     for (var field in widgetClass.fields) {
       // TODO: https://github.com/jakemac53/macro_prototype/issues/33
       if (!field.type.hackyIsSubtypeOf('Listenable')) continue;
@@ -140,9 +138,9 @@ external void dispose();
           'widget.${field.name}$questionMark.removeListener($handler);'));
     }
     if (definition.isExternal) {
-      builder.implement(FunctionBody.fromParts(['{', parts, '}']));
+      builder.implement(FunctionBody.fromParts(['{', parts, Statement('super.dispose();'), '}']));
     } else {
-      builder.wrapBody(after: parts);
+      builder.wrapBody(before: parts);
     }
   }
 
