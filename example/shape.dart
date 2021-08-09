@@ -147,6 +147,13 @@ abstract class Shape {
       {required R Function(double radius, String? debugLabel) circle,
       required R Function(double width, double height, String? debugLabel)
           rectangle});
+  void prettyPrint() {
+    when(
+        circle: (radius, _) => print('when $debugLabel: Circle radius $radius'),
+        rectangle: (width, height, _) =>
+            print('when $debugLabel: Rectangle width $width height $height'));
+  }
+
   Shape._();
   factory Shape.fromJson(Map<String, Object?> json) {
     switch (json['type'] as String?) {

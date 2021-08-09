@@ -40,6 +40,14 @@ void main() {
   final circle = Shape.circle(42, debugLabel: 'circle');
   print('circle: $circle');
 
+  print(
+    'Can access properties common to all union case (debugValue) without an upcast: ${circle.debugLabel}',
+  );
+
+  print(
+    'when upcasting `circle`, can read its radius: ${(circle as ShapeCircle).radius}',
+  );
+
   final rectangle =
       Shape.rectangle(width: 42, height: 21, debugLabel: 'rectangle');
   print('rectangle: $rectangle');
@@ -59,10 +67,11 @@ void main() {
   print('decodedRectangle: $decodedRectangle');
   print('rectangle == decodedRectangle: ${rectangle == decodedRectangle}');
 
-  printShape(circle);
-  printShape(rectangle);
-  printShape(decodedCircle);
-  printShape(decodedRectangle);
+  print('Can define methods shared by all shapes:');
+  circle.prettyPrint();
+  rectangle.prettyPrint();
+  decodedCircle.prettyPrint();
+  decodedRectangle.prettyPrint();
 
   final fooCircle = circle.copyWith(debugLabel: 'foo');
   print('copy `circle` with label "foo": $fooCircle');
@@ -72,13 +81,4 @@ void main() {
 
   final nullCircle = circle.copyWith(debugLabel: null);
   print('copy `circle` with label null: $nullCircle');
-}
-
-void printShape(Shape shape) {
-  shape.when(
-    circle: (radius, label) => print('when $label: Circle radius $radius'),
-    rectangle: (width, height, label) => print(
-      'when $label: Rectangle width $width height $height',
-    ),
-  );
 }
