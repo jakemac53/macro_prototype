@@ -7,7 +7,7 @@
 //
 // To make changes you should edit the `example/observable.gen.dart` file;
 
-import 'macros/observable.dart';
+import 'package:macro_builder/macros/observable.dart';
 
 class ObservableThing {
   @observable

@@ -7,8 +7,8 @@
 //
 // To make changes you should edit the `example/user.gen.dart` file;
 
-import 'macros/data_class.dart';
-import 'macros/json.dart';
+import 'package:macro_builder/macros/data_class.dart';
+import 'package:macro_builder/macros/json.dart';
 
 @dataClass
 @jsonSerializable

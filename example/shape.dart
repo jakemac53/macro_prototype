@@ -7,7 +7,7 @@
 //
 // To make changes you should edit the `example/shape.gen.dart` file;
 
-import 'macros/freezed.dart';
+import 'package:macro_builder/macros/freezed.dart';
 
 abstract class ShapeCircle extends Shape {
   @override
