@@ -34,24 +34,28 @@ void main() async {
         ? result.element.importedLibraries.map((library) => library.source.uri)
         : const Iterable.empty(),
   ).toList())
-      .whereType<ResolvedLibraryResult>();
-  var librariesByUri = {
-    for (var lib in allLibraries) lib.uri: lib,
-  };
-  var components = stronglyConnectedComponents(
-      allLibraries,
-      (ResolvedLibraryResult root) => root.element.importedLibraries
-          .map((imported) => librariesByUri[imported.source.uri])
-          .whereType<ResolvedLibraryResult>(),
-      equals: (ResolvedLibraryResult a, ResolvedLibraryResult b) =>
-          a.uri == b.uri,
-      hashCode: (ResolvedLibraryResult a) => a.uri.hashCode);
-  for (var component in components) {
-    print('libraries:');
-    for (var library in component) {
-      print('- ${library.uri}:');
-    }
+      .whereType<ResolvedLibraryResult>()
+      .toList();
+  for (var lib in allLibraries.reversed) {
+    print(lib.uri);
   }
+  // var librariesByUri = {
+  //   for (var lib in allLibraries) lib.uri: lib,
+  // };
+  // var components = stronglyConnectedComponents(
+  //     allLibraries,
+  //     (ResolvedLibraryResult root) => root.element.importedLibraries
+  //         .map((imported) => librariesByUri[imported.source.uri])
+  //         .whereType<ResolvedLibraryResult>(),
+  //     equals: (ResolvedLibraryResult a, ResolvedLibraryResult b) =>
+  //         a.uri == b.uri,
+  //     hashCode: (ResolvedLibraryResult a) => a.uri.hashCode);
+  // for (var component in components) {
+  //   print('libraries:');
+  //   for (var library in component) {
+  //     print('- ${library.uri}:');
+  //   }
+  // }
 }
 
 Stream<Uri> _findLocalLibraryUris(
