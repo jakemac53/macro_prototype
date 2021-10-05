@@ -1,10 +1,10 @@
 import 'package:collection/collection.dart';
 import 'package:macro_builder/definition.dart';
 
-const dataClass = _DataClass();
+const dataClass = DataClass();
 
-class _DataClass implements ClassDeclarationMacro {
-  const _DataClass();
+class DataClass implements ClassDeclarationMacro {
+  const DataClass();
 
   @override
   void visitClassDeclaration(

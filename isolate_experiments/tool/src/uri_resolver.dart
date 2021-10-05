@@ -1,6 +1,7 @@
 import 'package:analyzer/file_system/file_system.dart';
 // ignore: implementation_imports
 import 'package:analyzer/src/generated/source.dart';
+import 'package:path/path.dart' as p;
 import 'package:package_config/package_config.dart';
 
 class CustomUriResolver extends UriResolver {
@@ -11,7 +12,7 @@ class CustomUriResolver extends UriResolver {
 
   /// Attempts to normalize [uri] into an `asset:` uri.
   ///
-  /// Handles 'package:' or 'asset:' URIs.
+  /// Handles 'package:', 'asset:', or 'file:' URIs.
   ///
   /// Returns `null` for `dart` or `dart-ext` uris.
   ///
@@ -20,11 +21,14 @@ class CustomUriResolver extends UriResolver {
     switch (uri.scheme) {
       case 'package':
         var parts = uri.pathSegments;
-        return Uri(scheme: 'asset', pathSegments: [
-          parts.first,
-          'lib',
-          ...parts.skip(1),
-        ]);
+        return Uri(
+            scheme: 'asset',
+            path: p.joinAll([
+              '/',
+              parts.first,
+              'lib',
+              ...parts.skip(1),
+            ]));
       case 'asset':
         return uri;
       case 'file':

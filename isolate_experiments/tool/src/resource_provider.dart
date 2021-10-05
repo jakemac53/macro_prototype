@@ -6,8 +6,6 @@ import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:package_config/package_config.dart';
 import 'package:watcher/src/watch_event.dart';
 
-import 'uri_resolver.dart';
-
 class CustomResourceProvider extends PhysicalResourceProvider {
   final PackageConfig packageConfig;
 
