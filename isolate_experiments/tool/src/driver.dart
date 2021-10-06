@@ -4,7 +4,8 @@ import 'dart:isolate';
 
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/sdk/build_sdk_summary.dart';
-import 'package:analyzer/file_system/file_system.dart' show ResourceProvider;
+import 'package:analyzer/file_system/file_system.dart'
+    show ResourceProvider, ResourceUriResolver, Folder;
 import 'package:analyzer/file_system/physical_file_system.dart'
     show PhysicalResourceProvider;
 // ignore: implementation_imports
@@ -22,6 +23,8 @@ import 'package:analyzer/src/generated/engine.dart' show AnalysisOptionsImpl;
 // ignore: implementation_imports
 import 'package:analyzer/src/generated/source.dart';
 // ignore: implementation_imports
+import 'package:analyzer/src/source/package_map_resolver.dart';
+// ignore: implementation_imports
 import 'package:analyzer/src/summary/package_bundle_reader.dart';
 // ignore: implementation_imports
 import 'package:analyzer/src/summary/summary_sdk.dart' show SummaryBasedDartSdk;
@@ -37,29 +40,37 @@ import 'uri_resolver.dart';
 /// Any code which is not covered by the summaries must be resolvable through
 /// [uriResolver].
 Future<AnalysisDriver> analysisDriver(
-  CustomUriResolver uriResolver,
   PackageConfig packageConfig,
 ) async {
+  var resourceProvider = PhysicalResourceProvider();
+  var packageResolver = PackageMapUriResolver(resourceProvider, {
+    for (var pkg in packageConfig.packages)
+      pkg.name: [
+        resourceProvider.getFolder(p.absolute(pkg.packageUriRoot.path
+            .substring(0, pkg.packageUriRoot.path.length - 1)))
+      ],
+  });
+  var resourceResolver = ResourceUriResolver(resourceProvider);
+
   var sdkSummaryPath = await _generateSdkSummary();
   var sdk = SummaryBasedDartSdk(sdkSummaryPath, true);
   var dataStore = SummaryDataStore([sdkSummaryPath]);
 
   var sdkResolver = DartUriResolver(sdk);
-  var resolvers = [sdkResolver, uriResolver];
+  var resolvers = [sdkResolver, packageResolver, resourceResolver];
   var sourceFactory = SourceFactory(resolvers);
 
   var logger = PerformanceLog(null);
   var scheduler = AnalysisDriverScheduler(logger);
 
-  var packages =
-      _buildAnalyzerPackages(packageConfig, uriResolver.resourceProvider);
+  var packages = _buildAnalyzerPackages(packageConfig, resourceProvider);
   var options = AnalysisOptionsImpl()
     ..contextFeatures = FeatureSet.fromEnableFlags2(
         sdkLanguageVersion: sdkLanguageVersion, flags: const []);
   var driver = AnalysisDriver.tmp1(
       scheduler: scheduler,
       logger: logger,
-      resourceProvider: uriResolver.resourceProvider,
+      resourceProvider: resourceProvider,
       byteStore: MemoryByteStore(),
       sourceFactory: sourceFactory,
       analysisOptions: options,

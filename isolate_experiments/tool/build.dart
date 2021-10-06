@@ -1,84 +1,61 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/dart/element/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
-// ignore: implementation_imports
-import 'package:analyzer/src/dart/analysis/driver.dart';
 import 'package:graphs/graphs.dart';
 import 'package:package_config/package_config.dart';
-import 'package:path/path.dart' as p;
 
 import 'src/driver.dart';
-import 'src/resource_provider.dart';
-import 'src/uri_resolver.dart';
 
 void main() async {
-  var pkgConfig = await findPackageConfig(Directory.current);
+  var pkgConfig = await findPackageConfig(io.Directory.current);
   if (pkgConfig == null) {
     throw StateError(
         'Unable to load package config, run `dart pub get` and ensure '
         'you are running from the package root.');
   }
-  var resolver =
-      CustomUriResolver(pkgConfig, CustomResourceProvider(pkgConfig));
-  var driver = await analysisDriver(resolver, pkgConfig);
-
+  var driver = await analysisDriver(pkgConfig);
+  var localLibs = await _findLocalLibraryUris().toList();
   var allLibraries = (await crawlAsync<Uri, SomeResolvedLibraryResult>(
-    await _findLocalLibraryUris(driver, resolver).toList(),
+    localLibs,
     (Uri uri) async => (await driver.getResolvedLibraryByUri2(uri)),
-    (Uri uri, SomeResolvedLibraryResult result) => result
-            is ResolvedLibraryResult
-        ? result.element.importedLibraries.map((library) => library.source.uri)
-        : const Iterable.empty(),
+    (Uri uri, SomeResolvedLibraryResult result) =>
+        result is ResolvedLibraryResult
+            ? result.element.importedLibraries
+                .followedBy(result.element.exportedLibraries)
+                .map((library) => library.source.uri)
+            : const Iterable.empty(),
   ).toList())
       .whereType<ResolvedLibraryResult>()
       .toList();
+  var macroClass = allLibraries
+      .firstWhere(
+          (l) => l.uri == Uri.parse('package:macro_builder/src/macro.dart'))
+      .element
+      .getType('Macro')!;
   for (var lib in allLibraries.reversed) {
-    print(lib.uri);
-  }
-  // var librariesByUri = {
-  //   for (var lib in allLibraries) lib.uri: lib,
-  // };
-  // var components = stronglyConnectedComponents(
-  //     allLibraries,
-  //     (ResolvedLibraryResult root) => root.element.importedLibraries
-  //         .map((imported) => librariesByUri[imported.source.uri])
-  //         .whereType<ResolvedLibraryResult>(),
-  //     equals: (ResolvedLibraryResult a, ResolvedLibraryResult b) =>
-  //         a.uri == b.uri,
-  //     hashCode: (ResolvedLibraryResult a) => a.uri.hashCode);
-  // for (var component in components) {
-  //   print('libraries:');
-  //   for (var library in component) {
-  //     print('- ${library.uri}:');
-  //   }
-  // }
-}
-
-Stream<Uri> _findLocalLibraryUris(
-    AnalysisDriver driver, CustomUriResolver uriResolver) async* {
-  await for (var entity in Directory('lib').list(recursive: true)) {
-    if (entity is! File) continue;
-    var resolved = uriResolver.normalize(entity.absolute.uri);
-    if (resolved == null) continue;
-    yield resolved;
+    var macros = _discoverMacros(lib.element, macroClass.thisType);
+    print('Loading macros $macros from ${lib.uri}');
   }
 }
 
-// class MacroVisitor extends RecursiveElementVisitor {
-//   @override
-//   void visitClassElement(ClassElement element) {
-//     element.visitChildren(this);
-//     for (var annotation in element.metadata) {
-//       var value = annotation.computeConstantValue();
-//       if (value?.type == null) {
-//         throw StateError(
-//             'unable to compute annotation ${annotation.toSource()}');
-//       }
-//       if (element.library.typeSystem.isAssignableTo(leftType, value!.type!)) {}
-//     }
-//   }
-// }
+Stream<Uri> _findLocalLibraryUris() async* {
+  await for (var entity in io.Directory('lib').list(recursive: true)) {
+    if (entity is! io.File) continue;
+    yield entity.absolute.uri;
+  }
+}
+
+List<ClassElement> _discoverMacros(LibraryElement library, DartType macroType) {
+  var macros = <ClassElement>[];
+  var typeSystem = library.typeSystem;
+  for (var clazz in library.topLevelElements.whereType<ClassElement>()) {
+    if (clazz.isAbstract) continue;
+    if (typeSystem.isSubtypeOf(clazz.thisType, macroType)) {
+      macros.add(clazz);
+    }
+  }
+  return macros;
+}
