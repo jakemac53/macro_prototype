@@ -10,3 +10,4 @@ dev_dependencies:
   package_config: ^2.0.2
   path: ^1.8.0
   pub_semver: ^2.1.0
+  vm_service: ^7.3.0

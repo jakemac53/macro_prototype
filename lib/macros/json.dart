@@ -1,13 +1,13 @@
 import 'package:macro_builder/definition.dart';
 
-const jsonSerializable = _JsonMacro();
+const jsonSerializable = JsonMacro();
 
-class _JsonMacro
+class JsonMacro
     implements
         ClassDeclarationMacro,
         MethodDefinitionMacro,
         ConstructorDefinitionMacro {
-  const _JsonMacro();
+  const JsonMacro();
 
   @override
   void visitClassDeclaration(

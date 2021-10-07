@@ -17,10 +17,10 @@ class DataClass implements ClassDeclarationMacro {
   }
 }
 
-const autoConstructor = _AutoConstructor();
+const autoConstructor = AutoConstructor();
 
-class _AutoConstructor implements ClassDeclarationMacro {
-  const _AutoConstructor();
+class AutoConstructor implements ClassDeclarationMacro {
+  const AutoConstructor();
 
   @override
   void visitClassDeclaration(
@@ -76,11 +76,11 @@ class _AutoConstructor implements ClassDeclarationMacro {
   }
 }
 
-const copyWith = _CopyWith();
+const copyWith = CopyWith();
 
 // TODO: How to deal with overriding nullable fields to `null`?
-class _CopyWith implements ClassDeclarationMacro {
-  const _CopyWith();
+class CopyWith implements ClassDeclarationMacro {
+  const CopyWith();
 
   @override
   void visitClassDeclaration(
@@ -111,10 +111,10 @@ class _CopyWith implements ClassDeclarationMacro {
   }
 }
 
-const hashCode = _HashCode();
+const hashCode = HashCode();
 
-class _HashCode implements ClassDeclarationMacro {
-  const _HashCode();
+class HashCode implements ClassDeclarationMacro {
+  const HashCode();
 
   @override
   void visitClassDeclaration(
@@ -131,10 +131,10 @@ int get hashCode =>''');
   }
 }
 
-const equality = _Equality();
+const equality = Equality();
 
-class _Equality implements ClassDeclarationMacro {
-  const _Equality();
+class Equality implements ClassDeclarationMacro {
+  const Equality();
 
   @override
   void visitClassDeclaration(
@@ -149,10 +149,10 @@ bool operator==(Object other) => other is ${declaration.reference}''');
   }
 }
 
-const toString = _ToString();
+const toString = ToString();
 
-class _ToString implements ClassDeclarationMacro {
-  const _ToString();
+class ToString implements ClassDeclarationMacro {
+  const ToString();
 
   @override
   void visitClassDeclaration(
