@@ -4,8 +4,11 @@ import 'dart:io' as io;
 import 'dart:isolate' as isolate;
 
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type_system.dart';
+import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
 import 'package:isolate_experiments/protocol.dart';
 import 'package:package_config/package_config.dart';
@@ -16,46 +19,6 @@ import 'package:vm_service/vm_service_io.dart';
 import 'src/driver.dart';
 
 void main() async {
-  _log('Generating isolate script');
-  var tmpDir = await io.Directory.systemTemp.createTemp('macroIsolate');
-  var macroIsolateFile = io.File('${tmpDir.path}/main.dart');
-  await macroIsolateFile.writeAsString(_buildIsolateMain([]));
-
-  _log('Spawning macro process');
-  var macroProcess = await io.Process.start(io.Platform.executable, [
-    '--packages=${await isolate.Isolate.packageConfig}',
-    '--enable-vm-service',
-    macroIsolateFile.uri.toString(),
-  ]);
-  _log('Waiting for initial response');
-  macroProcess.stderr
-      .transform(const Utf8Decoder())
-      .transform(const LineSplitter())
-      .listen(io.stderr.writeln);
-  var lines = macroProcess.stdout
-      .transform(const Utf8Decoder())
-      .transform(const LineSplitter());
-  var serviceCompleter = Completer<VmService>();
-  Completer<RunMacroResponse>? nextResponseCompleter;
-  lines.listen((line) {
-    if (!serviceCompleter.isCompleted) {
-      _log('Connecting to vm service');
-      serviceCompleter.complete(vmServiceConnectUri(convertToWebSocketUrl(
-              serviceProtocolUrl: Uri.parse(line.split(' ').last))
-          .toString()));
-    } else {
-      if (!line.startsWith('The Dart DevTools debugger')) {
-        if (nextResponseCompleter != null) {
-          nextResponseCompleter!.complete(RunMacroResponse.fromJson(
-              jsonDecode(line) as Map<String, Object?>));
-          nextResponseCompleter = null;
-        }
-      }
-    }
-  });
-  var vmService = await serviceCompleter.future;
-  var rootIsolate = (await vmService.getVM()).isolates!.first;
-
   _log('Setting up analysis driver');
   var pkgConfig = await findPackageConfig(io.Directory.current);
   if (pkgConfig == null) {
@@ -69,7 +32,7 @@ void main() async {
   var localLibs = await _findLocalLibraryUris().toList();
 
   _log('Finding all reachable transitive libraries');
-  var allLibraries = (await crawlAsync<Uri, SomeResolvedLibraryResult>(
+  var allLibraries = await crawlAsync<Uri, SomeResolvedLibraryResult>(
     localLibs,
     (Uri uri) async => (await driver.getResolvedLibraryByUri2(uri)),
     (Uri uri, SomeResolvedLibraryResult result) =>
@@ -78,40 +41,172 @@ void main() async {
                 .followedBy(result.element.exportedLibraries)
                 .map((library) => library.source.uri)
             : const Iterable.empty(),
-  ).toList())
-      .whereType<ResolvedLibraryResult>()
+  )
+      .where((l) => l is ResolvedLibraryResult)
+      .cast<ResolvedLibraryResult>()
       .toList();
-  var macroClass = allLibraries
-      .firstWhere(
-          (l) => l.uri == Uri.parse('package:macro_builder/src/macro.dart'))
-      .element
-      .getType('Macro')!;
 
-  _log('Searching for macros');
-  var allMacros = <ClassElement>[];
-  for (var lib in allLibraries.reversed) {
-    var macros = _discoverMacros(lib.element, macroClass.thisType);
-    if (macros.isEmpty) continue;
+  _log('Indexing libraries by uri');
+  var librariesByUri = {
+    for (var library in allLibraries) library.uri: library,
+  };
+
+  _log('Grouping libraries into strongly connected components');
+  var libraryGroups = stronglyConnectedComponents(
+      allLibraries,
+      (ResolvedLibraryResult library) => [
+            for (var dep in library.element.importedLibraries)
+              if (librariesByUri.containsKey(dep.source.uri))
+                librariesByUri[dep.source.uri]!
+          ]);
+
+  _log('Loading and applying macros');
+  var macroLib =
+      librariesByUri[Uri.parse('package:macro_builder/src/macro.dart')]!
+          .element;
+  var macroClass = macroLib.getType('Macro')!;
+  var typeMacroClass = macroLib.getType('TypeMacro')!;
+  var declarationMacroClass = macroLib.getType('DeclarationMacro')!;
+  var definitionMacroClass = macroLib.getType('DefinitionMacro')!;
+
+  _log('Initializing the macro execution library');
+  var macroExecutor = await _MacroExecutor.start();
+  for (var group in libraryGroups) {
+    await macroExecutor._applyMacros(group, typeMacroClass.thisType);
+    await macroExecutor._applyMacros(group, declarationMacroClass.thisType);
+    await macroExecutor._applyMacros(group, definitionMacroClass.thisType);
+    await macroExecutor._discoverAndLoadMacros(group, macroClass.thisType);
+  }
+  _log('Exiting');
+  await macroExecutor.close();
+}
+
+class _MacroExecutor {
+  final allMacros = <ClassElement>[];
+  Completer<RunMacroResponse>? nextResponseCompleter;
+  final io.File macroIsolateFile;
+  final io.Process macroProcess;
+  final Stream<String> responseStream;
+  final IsolateRef rootIsolate;
+  final io.Directory tmpDir;
+  final VmService vmService;
+
+  _MacroExecutor({
+    required this.macroIsolateFile,
+    required this.macroProcess,
+    required this.responseStream,
+    required this.rootIsolate,
+    required this.tmpDir,
+    required this.vmService,
+  }) {
+    responseStream.listen((line) {
+      if (nextResponseCompleter != null) {
+        nextResponseCompleter!.complete(RunMacroResponse.fromJson(
+            jsonDecode(line) as Map<String, Object?>));
+        nextResponseCompleter = null;
+      }
+    });
+  }
+
+  static Future<_MacroExecutor> start() async {
+    _log('Generating isolate script');
+    var tmpDir = await io.Directory.systemTemp.createTemp('macroIsolate');
+    var macroIsolateFile = io.File('${tmpDir.path}/main.dart');
+    await macroIsolateFile.writeAsString(_buildIsolateMain([]));
+
+    _log('Spawning macro process');
+    var macroProcess = await io.Process.start(io.Platform.executable, [
+      '--packages=${await isolate.Isolate.packageConfig}',
+      '--enable-vm-service',
+      macroIsolateFile.uri.toString(),
+    ]);
+    _log('Waiting for initial response');
+    macroProcess.stderr
+        .transform(const Utf8Decoder())
+        .transform(const LineSplitter())
+        .listen(io.stderr.writeln);
+    var lines = macroProcess.stdout
+        .transform(const Utf8Decoder())
+        .transform(const LineSplitter());
+    var serviceCompleter = Completer<VmService>();
+    var responseController = StreamController<String>();
+    lines.listen((line) {
+      if (!serviceCompleter.isCompleted) {
+        _log('Connecting to vm service');
+        serviceCompleter.complete(vmServiceConnectUri(convertToWebSocketUrl(
+                serviceProtocolUrl: Uri.parse(line.split(' ').last))
+            .toString()));
+      } else {
+        if (!line.startsWith('The Dart DevTools debugger')) {
+          responseController.add(line);
+        }
+      }
+    }, onDone: responseController.close);
+    var vmService = await serviceCompleter.future;
+    _log('Waiting for macro isolate to be runnable');
+    await vmService.streamListen('Isolate');
+    final rootIsolate = (await vmService.onIsolateEvent.firstWhere((e) {
+      return e.kind == 'IsolateRunnable';
+    }))
+        .isolate!;
+
+    return _MacroExecutor(
+        macroIsolateFile: macroIsolateFile,
+        macroProcess: macroProcess,
+        responseStream: responseController.stream,
+        rootIsolate: rootIsolate,
+        tmpDir: tmpDir,
+        vmService: vmService);
+  }
+
+  Future<void> close() async {
+    await tmpDir.delete(recursive: true);
+    macroProcess.kill();
+  }
+
+  Future<void> _applyMacros(
+      List<ResolvedLibraryResult> libraryCycle, DartType macroType) async {
+    var typeSystem = libraryCycle.first.element.typeSystem;
+    for (var library in libraryCycle) {
+      var finder = _MacroApplicationFinder(macroType, typeSystem)
+        ..visitLibraryElement(library.element);
+      for (var match in finder.matches) {
+        _log(
+            'Sending macro request for ${match.annotation.toSource()} on ${match.annotatedElement}');
+        nextResponseCompleter = Completer<RunMacroResponse>();
+        macroProcess.stdin.writeln(jsonEncode(RunMacroRequest(
+                _macroId(match.value.type!.element as ClassElement), const {})
+            .toJson()));
+        var response = await nextResponseCompleter!.future;
+        _log('Macro response: ${response.generatedCode}');
+      }
+    }
+  }
+
+  Future<List<ClassElement>> _discoverAndLoadMacros(
+      List<ResolvedLibraryResult> libraryCycle, DartType macroType) async {
+    var macros = <ClassElement>[];
+    var typeSystem = libraryCycle.first.element.typeSystem;
+    for (var library in libraryCycle) {
+      for (var clazz
+          in library.element.topLevelElements.whereType<ClassElement>()) {
+        if (clazz.isAbstract) continue;
+        if (typeSystem.isSubtypeOf(clazz.thisType, macroType)) {
+          macros.add(clazz);
+        }
+      }
+    }
+    if (macros.isEmpty) return const [];
     allMacros.addAll(macros);
-    _log(
-        'Loading macros ${macros.map((m) => m.name).toList()} from ${lib.uri}');
+
+    _log('Loading macros ${macros.map((m) => m.name).toList()} from libraries: '
+        '[${libraryCycle.map((lib) => lib.uri).join(', ')}]');
     await macroIsolateFile.writeAsString(_buildIsolateMain(allMacros));
     var reloadResult =
         await vmService.callMethod('reloadSources', isolateId: rootIsolate.id);
-    _log('Reloaded: $reloadResult');
-    for (var macro in macros) {
-      _log('Sending macro request for ${macro.name}');
-      nextResponseCompleter = Completer<RunMacroResponse>();
-      macroProcess.stdin.writeln(
-          jsonEncode(RunMacroRequest(_macroId(macro), const {}).toJson()));
-      var response = await nextResponseCompleter!.future;
-      _log('Macro response: ${response.generatedCode}');
-    }
-    _log('Done loading macros from ${lib.uri}');
+    _log('Isolate reloaded: $reloadResult');
+    return macros;
   }
-  _log('Exiting');
-  await tmpDir.delete(recursive: true);
-  macroProcess.kill();
 }
 
 Stream<Uri> _findLocalLibraryUris() async* {
@@ -170,18 +265,6 @@ void main(List<String> _) async {
   return code.toString();
 }
 
-List<ClassElement> _discoverMacros(LibraryElement library, DartType macroType) {
-  var macros = <ClassElement>[];
-  var typeSystem = library.typeSystem;
-  for (var clazz in library.topLevelElements.whereType<ClassElement>()) {
-    if (clazz.isAbstract) continue;
-    if (typeSystem.isSubtypeOf(clazz.thisType, macroType)) {
-      macros.add(clazz);
-    }
-  }
-  return macros;
-}
-
 final _watch = Stopwatch()..start();
 
 void _log(String message) {
@@ -190,3 +273,94 @@ void _log(String message) {
 
 String _macroId(ClassElement macro) =>
     '${macro.librarySource.uri}#${macro.name}';
+
+class Match {
+  final DartObject value;
+  final ElementAnnotation annotation;
+  final Element annotatedElement;
+
+  Match(
+      {required this.value,
+      required this.annotatedElement,
+      required this.annotation});
+}
+
+class _MacroApplicationFinder extends RecursiveElementVisitor {
+  final List<Match> matches = [];
+  final DartType matchingType;
+  final TypeSystem typeSystem;
+
+  _MacroApplicationFinder(this.matchingType, this.typeSystem);
+
+  void _addMatchingAnnotations(Element element) {
+    for (var annotation in element.metadata) {
+      var value = annotation.computeConstantValue()!;
+      if (typeSystem.isSubtypeOf(value.type!, matchingType)) {
+        matches.add(Match(
+            value: value, annotatedElement: element, annotation: annotation));
+      }
+    }
+  }
+
+  @override
+  void visitClassElement(ClassElement element) {
+    super.visitClassElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitConstructorElement(ConstructorElement element) {
+    super.visitConstructorElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitExtensionElement(ExtensionElement element) {
+    super.visitExtensionElement(element);
+    // TODO: support extension macros
+    // _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitFieldElement(FieldElement element) {
+    super.visitFieldElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitFunctionElement(FunctionElement element) {
+    super.visitFunctionElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitLocalVariableElement(LocalVariableElement element) {
+    // TODO: implement visitLocalVariableElement
+    throw UnimplementedError();
+  }
+
+  @override
+  visitMethodElement(MethodElement element) {
+    super.visitMethodElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitPropertyAccessorElement(PropertyAccessorElement element) {
+    super.visitPropertyAccessorElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitTopLevelVariableElement(TopLevelVariableElement element) {
+    super.visitTopLevelVariableElement(element);
+    _addMatchingAnnotations(element);
+  }
+
+  @override
+  visitTypeAliasElement(TypeAliasElement element) {
+    super.visitTypeAliasElement(element);
+    // TODO: support type alias macros?
+    // _addMatchingAnnotations(element);
+  }
+}

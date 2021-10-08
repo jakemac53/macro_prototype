@@ -5,7 +5,7 @@ import 'dart:isolate';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/sdk/build_sdk_summary.dart';
 import 'package:analyzer/file_system/file_system.dart'
-    show ResourceProvider, ResourceUriResolver, Folder;
+    show ResourceProvider, ResourceUriResolver;
 import 'package:analyzer/file_system/physical_file_system.dart'
     show PhysicalResourceProvider;
 // ignore: implementation_imports
@@ -31,8 +31,6 @@ import 'package:analyzer/src/summary/summary_sdk.dart' show SummaryBasedDartSdk;
 import 'package:package_config/package_config.dart' show PackageConfig;
 import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
-
-import 'uri_resolver.dart';
 
 /// Builds an [AnalysisDriver] backed by a summary SDK and package summary
 /// files.
