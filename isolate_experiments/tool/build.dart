@@ -29,11 +29,11 @@ void main() async {
   var driver = await analysisDriver(pkgConfig);
 
   _log('Finding local libraries');
-  var localLibs = await _findLocalLibraryUris().toList();
+  var exampleLibs = await _findExampleLibraryUris().toList();
 
   _log('Finding all reachable transitive libraries');
   var allLibraries = await crawlAsync<Uri, SomeResolvedLibraryResult>(
-    localLibs,
+    exampleLibs,
     (Uri uri) async => (await driver.getResolvedLibraryByUri2(uri)),
     (Uri uri, SomeResolvedLibraryResult result) =>
         result is ResolvedLibraryResult
@@ -209,8 +209,8 @@ class _MacroExecutor {
   }
 }
 
-Stream<Uri> _findLocalLibraryUris() async* {
-  await for (var entity in io.Directory('lib').list(recursive: true)) {
+Stream<Uri> _findExampleLibraryUris() async* {
+  await for (var entity in io.Directory('example').list(recursive: true)) {
     if (entity is! io.File) continue;
     yield entity.absolute.uri;
   }
