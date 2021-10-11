@@ -6,6 +6,7 @@ dependencies:
     path: ../
 dev_dependencies:
   analyzer: ^2.0.0
+  async: ^2.8.2
   graphs: ^2.1.0
   package_config: ^2.0.2
   path: ^1.8.0

@@ -172,11 +172,29 @@ class _MacroExecutor {
         ..visitLibraryElement(library.element);
       for (var match in finder.matches) {
         _log(
-            'Sending macro request for ${match.annotation.toSource()} on ${match.annotatedElement}');
+            'Sending macro request for ${match.annotation.toSource()} matching '
+            'type ${macroType.getDisplayString(withNullability: false)} on '
+            '${match.annotatedElement}');
         nextResponseCompleter = Completer<RunMacroResponse>();
-        macroProcess.stdin.writeln(jsonEncode(RunMacroRequest(
-                _macroId(match.value.type!.element as ClassElement), const {})
-            .toJson()));
+        var macroClass = match.value.type as InterfaceType;
+        var appliedToClass = match.annotatedElement as ClassElement;
+        var appliedToClassDefinition = SerializableClassDefinition.fromElement(
+            appliedToClass,
+            originalReference: appliedToClass.thisType);
+        var request = RunMacroRequest(_macroId(macroClass.element),
+            const <String, Object?>{}, appliedToClassDefinition);
+        try {
+          macroProcess.stdin.writeln(jsonEncode(request.toJson()));
+        } catch (_) {
+          print(appliedToClassDefinition);
+          print(appliedToClassDefinition.toJson());
+          print(request);
+          print(request.toJson());
+          print(jsonEncode(appliedToClassDefinition));
+          print(jsonEncode(request));
+
+          rethrow;
+        }
         var response = await nextResponseCompleter!.future;
         _log('Macro response: ${response.generatedCode}');
       }
@@ -219,10 +237,12 @@ Stream<Uri> _findExampleLibraryUris() async* {
 String _buildIsolateMain(List<ClassElement> macros) {
   var importsAdded = <Uri>{};
   var code = StringBuffer(r'''
+import 'dart:cli';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:async/async.dart';
 import 'package:macro_builder/definition.dart';
 import 'package:isolate_experiments/protocol.dart';
 ''');
@@ -251,15 +271,28 @@ Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
       throw StateError('Unknown macro ${request.identifier}');
   }
 
-  return RunMacroResponse('$macro');
+  return RunMacroResponse('Ran $macro on ${(request.declaration as ClassDefinition).name}');
 }
 
+ReflectTypeResponse<T> reflectTypeSync<T extends Serializable>(
+        ReflectTypeRequest request) {
+  stdout.writeln(jsonEncode(request.toJson()));
+  var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
+  return ReflectTypeResponse<T>.fromJson(message);
+}
+
+final stdinLines = StreamQueue<String>(
+    stdin.transform(const Utf8Decoder()).transform(const LineSplitter()));
+
 void main(List<String> _) async {
-  stdin.transform(const Utf8Decoder()).transform(const LineSplitter()).listen((line) async {
-    var message = jsonDecode(line) as Map<String, Object?>;
-    var response = await _runMacro(RunMacroRequest.fromJson(message));
+  reflectType = reflectTypeSync;
+
+  while (await stdinLines.hasNext) {
+    var line = await stdinLines.next;
+    var request = RunMacroRequest.fromJson(jsonDecode(line) as Map<String, Object?>);
+    var response = await _runMacro(request);
     stdout.writeln(jsonEncode(response.toJson()));
-  });
+  }
 }
 ''');
   return code.toString();
