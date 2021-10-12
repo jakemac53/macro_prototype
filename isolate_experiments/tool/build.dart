@@ -8,7 +8,6 @@ import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type_provider.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
@@ -129,54 +128,18 @@ class _MacroExecutor {
           }
           break;
         case 'ReflectTypeRequest':
+          _log('Responding to ReflectTypeRequest');
           var request = ReflectTypeRequest.fromJson(json);
-
-          DartType _resolveType(TypeReferenceDescriptor descriptor) {
-            var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
-            var element = library.getType(descriptor.name);
-            if (element == null) {
-              throw StateError(
-                  'Could not resolve ${descriptor.name} in ${descriptor.libraryUri}');
-            }
-            var typeArgs = [
-              for (var arg in descriptor.typeArguments) _resolveType(arg),
-            ];
-            return element.instantiate(
-                typeArguments: typeArgs,
-                nullabilitySuffix: descriptor.isNullable
-                    ? NullabilitySuffix.question
-                    : NullabilitySuffix.none);
-          }
           var type = _resolveType(request.descriptor);
+          _log('Resolved type ${type.getDisplayString(withNullability: true)}');
           var declaration = SerializableClassDefinition.fromElement(
               type.element as ClassElement,
               originalReference: type);
           var response = ReflectTypeResponse(declaration);
-          try {
-            macroProcess.stdin.writeln(jsonEncode(response.toJson()));
-          } catch (_) {
-            var map = response.toJson();
-            void _tryRecursive(Object? json, List<String> path) {
-              try {
-                jsonEncode(json);
-              } catch (_) {
-                if (json is Map) {
-                  for (var entry in json.entries) {
-                    _tryRecursive(entry.value, [...path, entry.key as String]);
-                  }
-                } else if (json is List) {
-                  for (var i = 0; i < json.length; i++) {
-                    _tryRecursive(json[i], [...path, i.toString()]);
-                  }
-                } else {
-                  throw 'Failed to encode $json at ${path.join(' -> ')}';
-                }
-              }
-            }
-
-            _tryRecursive(map, []);
-            rethrow;
-          }
+          _log('Encoding ResolveTypeResponse');
+          var responseString = jsonEncode(response.toJson());
+          macroProcess.stdin.writeln(responseString);
+          _log('Completed ReflectTypeRequest');
           break;
         default:
           throw StateError('unhandled response $line');
@@ -249,21 +212,31 @@ class _MacroExecutor {
       var finder = _MacroApplicationFinder(macroType, typeSystem)
         ..visitLibraryElement(library.element);
       for (var match in finder.matches) {
-        _log(
-            'Sending macro request for ${match.annotation.toSource()} matching '
-            'type ${macroType.getDisplayString(withNullability: false)} on '
-            '${match.annotatedElement}');
-        runMacroResponseCompleter = Completer<RunMacroResponse>();
-        var macroClass = match.value.type as InterfaceType;
-        var appliedToClass = match.annotatedElement as ClassElement;
-        var appliedToClassDefinition = SerializableClassDefinition.fromElement(
-            appliedToClass,
-            originalReference: appliedToClass.thisType);
-        var request = RunMacroRequest(_macroId(macroClass.element),
-            const <String, Object?>{}, appliedToClassDefinition, phase);
-        macroProcess.stdin.writeln(jsonEncode(request.toJson()));
-        var response = await runMacroResponseCompleter!.future;
-        _log('Macro response: ${response.generatedCode}');
+        var watch = Stopwatch();
+        for (var i = 0; i < 100; i++) {
+          _log(
+              'Sending macro request $i for ${match.annotation.toSource()} matching '
+              'type ${macroType.getDisplayString(withNullability: false)} on '
+              '${match.annotatedElement}');
+          watch.start();
+          runMacroResponseCompleter = Completer<RunMacroResponse>();
+          var macroClass = match.value.type as InterfaceType;
+          var appliedToClass = match.annotatedElement as ClassElement;
+          var appliedToClassDefinition =
+              SerializableClassDefinition.fromElement(appliedToClass,
+                  originalReference: appliedToClass.thisType);
+          var request = RunMacroRequest(_macroId(macroClass.element),
+              const <String, Object?>{}, appliedToClassDefinition, phase);
+          _log('encoding request: (${watch.elapsed})');
+          macroProcess.stdin.writeln(jsonEncode(request.toJson()));
+          _log('sending request: (${watch.elapsed})');
+          var response = await runMacroResponseCompleter!.future;
+          _log(
+              'Macro response $i: ${response.generatedCode} (took ${watch.elapsed})');
+          watch
+            ..stop()
+            ..reset();
+        }
       }
     }
   }
@@ -291,6 +264,23 @@ class _MacroExecutor {
         await vmService.callMethod('reloadSources', isolateId: rootIsolate.id);
     _log('Isolate reloaded: $reloadResult');
     return macros;
+  }
+
+  DartType _resolveType(TypeReferenceDescriptor descriptor) {
+    var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
+    var element = library.getType(descriptor.name);
+    if (element == null) {
+      throw StateError(
+          'Could not resolve ${descriptor.name} in ${descriptor.libraryUri}');
+    }
+    var typeArgs = [
+      for (var arg in descriptor.typeArguments) _resolveType(arg),
+    ];
+    return element.instantiate(
+        typeArguments: typeArgs,
+        nullabilitySuffix: descriptor.isNullable
+            ? NullabilitySuffix.question
+            : NullabilitySuffix.none);
   }
 }
 
@@ -404,12 +394,16 @@ Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
   return RunMacroResponse(builder.builtCode.join('\n\n'));
 }
 
+final _cache = <TypeReferenceDescriptor, Serializable>{};
+
 ReflectTypeResponse<T> reflectTypeSync<T extends Serializable>(
         ReflectTypeRequest request) {
-  stdout.writeln(jsonEncode(request.toJson()));
-  var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
-  assert(message['type'] == 'ReflectTypeResponse');
-  return ReflectTypeResponse<T>.fromJson(message);
+  return ReflectTypeResponse<T>(_cache.putIfAbsent(request.descriptor, () {
+    stdout.writeln(jsonEncode(request.toJson()));
+    var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
+    assert(message['type'] == 'ReflectTypeResponse');
+    return deserializeDeclaration(message['declaration'] as Map<String, Object?>);
+  }) as T);
 }
 
 final stdinLines = StreamQueue<String>(

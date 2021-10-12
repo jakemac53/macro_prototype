@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 import 'src/introspection/serializable.dart';
 
 export 'src/introspection/serializable.dart';
@@ -105,6 +107,18 @@ class TypeReferenceDescriptor {
           for (var arg in typeArguments) arg.toJson(),
         ],
       };
+
+  @override
+  bool operator ==(Object other) =>
+      other is TypeReferenceDescriptor &&
+      other.libraryUri == libraryUri &&
+      other.name == name &&
+      other.isNullable == isNullable &&
+      const DeepCollectionEquality().equals(other.typeArguments, typeArguments);
+
+  @override
+  int get hashCode =>
+      Object.hashAll([libraryUri, name, isNullable, ...typeArguments]);
 }
 
 abstract class Serializable {
