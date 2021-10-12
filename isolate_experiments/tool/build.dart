@@ -141,6 +141,60 @@ class _MacroExecutor {
           macroProcess.stdin.writeln(responseString);
           _log('Completed ReflectTypeRequest');
           break;
+        case 'GetDeclarationRequest':
+          var request = GetDeclarationRequest.fromJson(json);
+          var descriptor = request.descriptor;
+          var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
+          var parentType = descriptor.parentType;
+          Element element;
+          if (parentType == null) {
+            element = library.topLevelElements
+                .firstWhere((element) => element.name == descriptor.name);
+          } else {
+            var parentTypeElement = library.getType(parentType)!;
+            switch (descriptor.declarationType) {
+              case DeclarationType.clazz:
+                element = parentTypeElement;
+                break;
+              case DeclarationType.field:
+                element = parentTypeElement.getField(descriptor.name)!;
+                break;
+              case DeclarationType.method:
+                element = parentTypeElement.getMethod(descriptor.name)!;
+                break;
+              case DeclarationType.constructor:
+                if (descriptor.name.isEmpty) {
+                  element = parentTypeElement.unnamedConstructor!;
+                } else {
+                  element =
+                      parentTypeElement.getNamedConstructor(descriptor.name)!;
+                }
+                break;
+            }
+          }
+          Serializable declaration;
+          switch (descriptor.declarationType) {
+            case DeclarationType.clazz:
+              declaration = SerializableClassDefinition.fromElement(
+                  element as ClassElement,
+                  originalReference: element.thisType);
+              break;
+            case DeclarationType.field:
+              declaration = SerializableFieldDefinition.fromElement(
+                  element as FieldElement);
+              break;
+            case DeclarationType.method:
+              declaration = SerializableMethodDefinition.fromElement(
+                  element as MethodElement);
+              break;
+            case DeclarationType.constructor:
+              declaration = SerializableConstructorDefinition.fromElement(
+                  element as ConstructorElement);
+              break;
+          }
+          var response = GetDeclarationResponse(declaration);
+          macroProcess.stdin.writeln(jsonEncode(response.toJson()));
+          break;
         default:
           throw StateError('unhandled response $line');
       }
@@ -222,11 +276,12 @@ class _MacroExecutor {
           runMacroResponseCompleter = Completer<RunMacroResponse>();
           var macroClass = match.value.type as InterfaceType;
           var appliedToClass = match.annotatedElement as ClassElement;
-          var appliedToClassDefinition =
-              SerializableClassDefinition.fromElement(appliedToClass,
-                  originalReference: appliedToClass.thisType);
-          var request = RunMacroRequest(_macroId(macroClass.element),
-              const <String, Object?>{}, appliedToClassDefinition, phase);
+          var request = RunMacroRequest(
+              _macroId(macroClass.element),
+              const <String, Object?>{},
+              DeclarationDescriptor(appliedToClass.source.uri.toString(), null,
+                  appliedToClass.name, DeclarationType.clazz),
+              phase);
           _log('encoding request: (${watch.elapsed})');
           macroProcess.stdin.writeln(jsonEncode(request.toJson()));
           _log('sending request: (${watch.elapsed})');
@@ -311,6 +366,16 @@ import 'package:isolate_experiments/protocol.dart';
 
   code.writeln(r'''
 
+final _declarationCache = <DeclarationDescriptor, Serializable>{};
+Serializable _getDeclaration(DeclarationDescriptor descriptor) {
+  return _declarationCache.putIfAbsent(descriptor, () {
+    stdout.writeln(jsonEncode(GetDeclarationRequest(descriptor).toJson()));
+    var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
+    assert(message['type'] == 'GetDeclarationResponse');
+    return deserializeDeclaration(message['declaration'] as Map<String, Object?>);
+  });
+}
+
 Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
   Macro? macro; // Gets built in the switch
   switch (request.identifier) {''');
@@ -328,7 +393,7 @@ Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
       throw StateError('Unknown macro ${request.identifier}');
   }
 
-  final declaration = request.declaration;
+  final declaration = _getDeclaration(request.declarationDescriptor);
   late GenericBuilder builder;
   switch(request.phase) {
     case Phase.type:

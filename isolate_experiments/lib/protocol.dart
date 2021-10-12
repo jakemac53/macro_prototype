@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:macro_builder/macros/data_class.dart';
 
 import 'src/introspection/serializable.dart';
 
@@ -14,23 +15,23 @@ enum Phase {
 class RunMacroRequest {
   final String identifier;
   final Map<String, Object?> arguments;
-  final Serializable declaration;
+  final DeclarationDescriptor declarationDescriptor;
   final Phase phase;
 
   RunMacroRequest(
-      this.identifier, this.arguments, this.declaration, this.phase);
+      this.identifier, this.arguments, this.declarationDescriptor, this.phase);
 
   RunMacroRequest.fromJson(Map<String, Object?> json)
       : arguments = json['arguments'] as Map<String, Object?>,
         identifier = json['identifier'] as String,
-        declaration =
-            deserializeDeclaration(json['declaration'] as Map<String, Object?>),
+        declarationDescriptor = DeclarationDescriptor.fromJson(
+            json['declarationDescriptor'] as Map<String, Object?>),
         phase = Phase.values[json['phase'] as int];
 
   Map<String, Object?> toJson() => {
         'arguments': arguments,
         'identifier': identifier,
-        'declaration': declaration.toJson(),
+        'declarationDescriptor': declarationDescriptor.toJson(),
         'phase': phase.index,
         'type': 'RunMacroRequest',
       };
@@ -78,6 +79,78 @@ class ReflectTypeResponse<T extends Serializable> {
         'declaration': declaration.toJson(),
         'type': 'ReflectTypeResponse',
       };
+}
+
+class GetDeclarationRequest {
+  final DeclarationDescriptor descriptor;
+
+  GetDeclarationRequest(this.descriptor);
+
+  GetDeclarationRequest.fromJson(Map<String, Object?> json)
+      : descriptor = DeclarationDescriptor.fromJson(
+            json['descriptor'] as Map<String, Object?>);
+
+  Map<String, Object?> toJson() => {
+        'descriptor': descriptor.toJson(),
+        'type': 'GetDeclarationRequest',
+      };
+}
+
+class GetDeclarationResponse {
+  final Serializable declaration;
+  GetDeclarationResponse(this.declaration);
+
+  GetDeclarationResponse.fromJson(Map<String, Object?> json)
+      : declaration =
+            deserializeDeclaration(json['declaration'] as Map<String, Object?>);
+
+  Map<String, Object?> toJson() => {
+        'declaration': declaration.toJson(),
+        'type': 'GetDeclarationResponse',
+      };
+}
+
+enum DeclarationType {
+  clazz,
+  field,
+  method,
+  constructor,
+}
+
+class DeclarationDescriptor {
+  final String libraryUri;
+  final String? parentType;
+  final String name;
+  final DeclarationType declarationType;
+
+  DeclarationDescriptor(
+      this.libraryUri, this.parentType, this.name, this.declarationType);
+
+  DeclarationDescriptor.fromJson(Map<String, Object?> json)
+      : libraryUri = json['libraryUri'] as String,
+        parentType = json['parentType'] as String?,
+        name = json['name'] as String,
+        declarationType =
+            DeclarationType.values[json['declarationType'] as int];
+
+  Map<String, Object?> toJson() => {
+        'libraryUri': libraryUri,
+        if (parentType != null) 'parentType': parentType,
+        'name': name,
+        'declarationType': declarationType.index,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeclarationDescriptor &&
+      other.declarationType == declarationType &&
+      other.name == name &&
+      other.parentType == parentType &&
+      other.libraryUri == libraryUri;
+
+  @override
+  int get hashCode =>
+      Object.hash(declarationType, name, parentType, libraryUri);
 }
 
 class TypeReferenceDescriptor {
