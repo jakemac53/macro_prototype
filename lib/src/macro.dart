@@ -110,7 +110,7 @@ abstract class ConstructorTypeMacro implements TypeMacro {
 }
 
 /// The interface for [DeclarationMacro]s that can be applied to constructors.
-abstract class ConstructorDeclarationMacro implements DefinitionMacro {
+abstract class ConstructorDeclarationMacro implements DeclarationMacro {
   void visitConstructorDeclaration(
       ConstructorDeclaration declaration, ClassDeclarationBuilder builder);
 }

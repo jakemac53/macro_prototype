@@ -35,14 +35,22 @@ T deserializeDeclaration<T extends Serializable>(Map<String, Object?> json) {
 }
 
 TypeReferenceDescriptor _typeDescriptorForType(analyzer.DartType type) {
-  if (type.isVoid) return TypeReferenceDescriptor('dart:core', 'void');
-  if (type.isDynamic) return TypeReferenceDescriptor('dart:core', 'dynamic');
-  if (type.element is! analyzer.TypeDefiningElement) {
-    throw StateError(
-        'Type has no element or is not a TypeDefiningElement: $type');
+  if (type.isVoid) return TypeReferenceDescriptor('dart:core', 'void', false);
+  if (type.isDynamic) {
+    return TypeReferenceDescriptor('dart:core', 'dynamic', false);
   }
-  return _typeDescriptorForElement(
-      type.element as analyzer.TypeDefiningElement, type);
+  var element = type.element;
+  if (element is analyzer.TypeDefiningElement) {
+    return _typeDescriptorForElement(element, type);
+  } else if (type is analyzer.FunctionType) {
+    return TypeReferenceDescriptor(
+        element == null ? 'unknown' : element.source!.uri.toString(),
+        type.getDisplayString(withNullability: true),
+        type.nullabilitySuffix == analyzer.NullabilitySuffix.question);
+  } else {
+    throw StateError(
+        'Type could not be serialized: ${type.runtimeType} : $type ');
+  }
 }
 
 TypeReferenceDescriptor _typeDescriptorForElement(
@@ -50,7 +58,11 @@ TypeReferenceDescriptor _typeDescriptorForElement(
     [analyzer.DartType? originalReference]) {
   var source = type.source;
   if (source == null) throw StateError('Empty source for $type');
-  return TypeReferenceDescriptor(source.uri.toString(), type.name!,
+  return TypeReferenceDescriptor(
+      source.uri.toString(),
+      type.name!,
+      originalReference?.nullabilitySuffix ==
+          analyzer.NullabilitySuffix.question,
       typeArguments: [
         if (originalReference is analyzer.ParameterizedType)
           for (var typeArgument in originalReference.typeArguments)
@@ -117,7 +129,7 @@ class SerializableTypeDefinition extends _SerializableBase
   String get name => json['name'] as String;
 
   @override
-  Code get reference => throw UnimplementedError();
+  Code get reference => TypeAnnotation(name);
 
   @override
   Scope get scope => throw UnimplementedError();
@@ -214,30 +226,39 @@ class SerializableClassDefinition extends SerializableTypeDefinition
   @override
   Iterable<MethodDefinition> get constructors => [
         for (var constructorJson in json['constructors'] as List)
-          deserializeDeclaration(constructorJson as Map<String, Object?>),
+          deserializeDeclaration<SerializableMethodDefinition>(
+              constructorJson as Map<String, Object?>),
       ];
 
   @override
   Iterable<MethodDefinition> get methods => [
         for (var methodJson in json['methods'] as List)
-          deserializeDeclaration(methodJson as Map<String, Object?>),
+          deserializeDeclaration<SerializableMethodDefinition>(
+              methodJson as Map<String, Object?>),
       ];
 
   @override
   Iterable<FieldDefinition> get fields => [
         for (var fieldJson in json['fields'] as List)
-          deserializeDeclaration(fieldJson as Map<String, Object?>),
+          deserializeDeclaration<SerializableFieldDefinition>(
+              fieldJson as Map<String, Object?>),
       ];
 
   @override
   ClassDefinition? get superclass => json['superclass'] != null
-      ? deserializeDeclaration(json['superclass'] as Map<String, Object?>)
+      ? reflectType<SerializableClassDefinition>(ReflectTypeRequest(
+              TypeReferenceDescriptor.fromJson(
+                  json['superclass'] as Map<String, Object?>)))
+          .declaration
       : null;
 
   @override
   Iterable<TypeDeclaration> get superinterfaces => [
         for (var interfaceJson in json['superinterfaces'] as List)
-          deserializeDeclaration(interfaceJson as Map<String, Object?>),
+          reflectType<SerializableTypeDefinition>(ReflectTypeRequest(
+                  TypeReferenceDescriptor.fromJson(
+                      interfaceJson as Map<String, Object?>)))
+              .declaration
       ];
 }
 
@@ -258,11 +279,11 @@ class SerializableFunctionDefinition extends _SerializableBase
           json['isSetter'] =
               e is analyzer.PropertyAccessorElement && e.isSetter;
           json['name'] = e.name;
-          json['namedParameters'] = {
+          json['namedParameters'] = [
             for (var param in element.parameters)
               if (param.isNamed)
                 SerializableParameterDefinition.fromElement(param).toJson(),
-          };
+          ];
           json['positionalParameters'] = [
             for (var param in element.parameters)
               if (param.isPositional)
@@ -296,13 +317,15 @@ class SerializableFunctionDefinition extends _SerializableBase
   Map<String, ParameterDefinition> get namedParameters => {
         for (var paramJson in json['namedParameters'] as List)
           paramJson['name'] as String:
-              deserializeDeclaration(paramJson as Map<String, Object?>),
+              deserializeDeclaration<SerializableParameterDefinition>(
+                  paramJson as Map<String, Object?>),
       };
 
   @override
   Iterable<ParameterDefinition> get positionalParameters => {
         for (var paramJson in json['positionalParameters'] as List)
-          deserializeDeclaration(paramJson as Map<String, Object?>),
+          deserializeDeclaration<SerializableParameterDefinition>(
+              paramJson as Map<String, Object?>),
       };
 
   @override

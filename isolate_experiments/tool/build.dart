@@ -5,8 +5,10 @@ import 'dart:isolate' as isolate;
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/constant/value.dart';
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type_provider.dart';
 import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
@@ -70,11 +72,23 @@ void main() async {
   var definitionMacroClass = macroLib.getType('DefinitionMacro')!;
 
   _log('Initializing the macro execution library');
-  var macroExecutor = await _MacroExecutor.start();
+  var dartCore =
+      (await driver.getLibraryByUri2('dart:core')) as LibraryElementResult;
+  var macroExecutor = await _MacroExecutor.start((Uri uri) {
+    if (uri.scheme == 'dart' && uri.path.startsWith('core')) {
+      return dartCore.element;
+    }
+    var lib = librariesByUri[uri];
+    if (lib == null) throw StateError('could not resolve $uri');
+    return lib.element;
+  });
   for (var group in libraryGroups) {
-    await macroExecutor._applyMacros(group, typeMacroClass.thisType);
-    await macroExecutor._applyMacros(group, declarationMacroClass.thisType);
-    await macroExecutor._applyMacros(group, definitionMacroClass.thisType);
+    await macroExecutor._applyMacros(
+        group, typeMacroClass.thisType, Phase.type);
+    await macroExecutor._applyMacros(
+        group, declarationMacroClass.thisType, Phase.declaration);
+    await macroExecutor._applyMacros(
+        group, definitionMacroClass.thisType, Phase.definition);
     await macroExecutor._discoverAndLoadMacros(group, macroClass.thisType);
   }
   _log('Exiting');
@@ -83,9 +97,10 @@ void main() async {
 
 class _MacroExecutor {
   final allMacros = <ClassElement>[];
-  Completer<RunMacroResponse>? nextResponseCompleter;
+  Completer<RunMacroResponse>? runMacroResponseCompleter;
   final io.File macroIsolateFile;
   final io.Process macroProcess;
+  final LibraryElement Function(Uri) resolveLibrary;
   final Stream<String> responseStream;
   final IsolateRef rootIsolate;
   final io.Directory tmpDir;
@@ -94,21 +109,83 @@ class _MacroExecutor {
   _MacroExecutor({
     required this.macroIsolateFile,
     required this.macroProcess,
+    required this.resolveLibrary,
     required this.responseStream,
     required this.rootIsolate,
     required this.tmpDir,
     required this.vmService,
   }) {
     responseStream.listen((line) {
-      if (nextResponseCompleter != null) {
-        nextResponseCompleter!.complete(RunMacroResponse.fromJson(
-            jsonDecode(line) as Map<String, Object?>));
-        nextResponseCompleter = null;
+      var json = jsonDecode(line) as Map<String, Object?>;
+      var type = json['type'] as String;
+      switch (type) {
+        case 'RunMacroResponse':
+          if (runMacroResponseCompleter != null) {
+            runMacroResponseCompleter!
+                .complete(RunMacroResponse.fromJson(json));
+            runMacroResponseCompleter = null;
+          } else {
+            throw StateError('Got an unexpected RunMacroResponse');
+          }
+          break;
+        case 'ReflectTypeRequest':
+          var request = ReflectTypeRequest.fromJson(json);
+
+          DartType _resolveType(TypeReferenceDescriptor descriptor) {
+            var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
+            var element = library.getType(descriptor.name);
+            if (element == null) {
+              throw StateError(
+                  'Could not resolve ${descriptor.name} in ${descriptor.libraryUri}');
+            }
+            var typeArgs = [
+              for (var arg in descriptor.typeArguments) _resolveType(arg),
+            ];
+            return element.instantiate(
+                typeArguments: typeArgs,
+                nullabilitySuffix: descriptor.isNullable
+                    ? NullabilitySuffix.question
+                    : NullabilitySuffix.none);
+          }
+          var type = _resolveType(request.descriptor);
+          var declaration = SerializableClassDefinition.fromElement(
+              type.element as ClassElement,
+              originalReference: type);
+          var response = ReflectTypeResponse(declaration);
+          try {
+            macroProcess.stdin.writeln(jsonEncode(response.toJson()));
+          } catch (_) {
+            var map = response.toJson();
+            void _tryRecursive(Object? json, List<String> path) {
+              try {
+                jsonEncode(json);
+              } catch (_) {
+                if (json is Map) {
+                  for (var entry in json.entries) {
+                    _tryRecursive(entry.value, [...path, entry.key as String]);
+                  }
+                } else if (json is List) {
+                  for (var i = 0; i < json.length; i++) {
+                    _tryRecursive(json[i], [...path, i.toString()]);
+                  }
+                } else {
+                  throw 'Failed to encode $json at ${path.join(' -> ')}';
+                }
+              }
+            }
+
+            _tryRecursive(map, []);
+            rethrow;
+          }
+          break;
+        default:
+          throw StateError('unhandled response $line');
       }
     });
   }
 
-  static Future<_MacroExecutor> start() async {
+  static Future<_MacroExecutor> start(
+      LibraryElement Function(Uri) resolveLibrary) async {
     _log('Generating isolate script');
     var tmpDir = await io.Directory.systemTemp.createTemp('macroIsolate');
     var macroIsolateFile = io.File('${tmpDir.path}/main.dart');
@@ -153,6 +230,7 @@ class _MacroExecutor {
     return _MacroExecutor(
         macroIsolateFile: macroIsolateFile,
         macroProcess: macroProcess,
+        resolveLibrary: resolveLibrary,
         responseStream: responseController.stream,
         rootIsolate: rootIsolate,
         tmpDir: tmpDir,
@@ -164,8 +242,8 @@ class _MacroExecutor {
     macroProcess.kill();
   }
 
-  Future<void> _applyMacros(
-      List<ResolvedLibraryResult> libraryCycle, DartType macroType) async {
+  Future<void> _applyMacros(List<ResolvedLibraryResult> libraryCycle,
+      DartType macroType, Phase phase) async {
     var typeSystem = libraryCycle.first.element.typeSystem;
     for (var library in libraryCycle) {
       var finder = _MacroApplicationFinder(macroType, typeSystem)
@@ -175,27 +253,16 @@ class _MacroExecutor {
             'Sending macro request for ${match.annotation.toSource()} matching '
             'type ${macroType.getDisplayString(withNullability: false)} on '
             '${match.annotatedElement}');
-        nextResponseCompleter = Completer<RunMacroResponse>();
+        runMacroResponseCompleter = Completer<RunMacroResponse>();
         var macroClass = match.value.type as InterfaceType;
         var appliedToClass = match.annotatedElement as ClassElement;
         var appliedToClassDefinition = SerializableClassDefinition.fromElement(
             appliedToClass,
             originalReference: appliedToClass.thisType);
         var request = RunMacroRequest(_macroId(macroClass.element),
-            const <String, Object?>{}, appliedToClassDefinition);
-        try {
-          macroProcess.stdin.writeln(jsonEncode(request.toJson()));
-        } catch (_) {
-          print(appliedToClassDefinition);
-          print(appliedToClassDefinition.toJson());
-          print(request);
-          print(request.toJson());
-          print(jsonEncode(appliedToClassDefinition));
-          print(jsonEncode(request));
-
-          rethrow;
-        }
-        var response = await nextResponseCompleter!.future;
+            const <String, Object?>{}, appliedToClassDefinition, phase);
+        macroProcess.stdin.writeln(jsonEncode(request.toJson()));
+        var response = await runMacroResponseCompleter!.future;
         _log('Macro response: ${response.generatedCode}');
       }
     }
@@ -255,7 +322,7 @@ import 'package:isolate_experiments/protocol.dart';
   code.writeln(r'''
 
 Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
-  Macro? macro; // Gets build in the switch
+  Macro? macro; // Gets built in the switch
   switch (request.identifier) {''');
 
   for (var macro in macros) {
@@ -271,13 +338,77 @@ Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
       throw StateError('Unknown macro ${request.identifier}');
   }
 
-  return RunMacroResponse('Ran $macro on ${(request.declaration as ClassDefinition).name}');
+  final declaration = request.declaration;
+  late GenericBuilder builder;
+  switch(request.phase) {
+    case Phase.type:
+      builder = GenericTypeBuilder();
+      if (macro is ClassTypeMacro && declaration is ClassType) {
+        macro.visitClassType(declaration as ClassType, builder as TypeBuilder);
+      } else if (macro is FieldTypeMacro && declaration is FieldType) {
+        macro.visitFieldType(declaration as FieldType, builder as TypeBuilder);
+      } else if (macro is FunctionTypeMacro && declaration is FunctionType) {
+        macro.visitFunctionType(declaration as FunctionType, builder as TypeBuilder);
+      } else if (macro is MethodTypeMacro && declaration is MethodType) {
+        macro.visitMethodType(declaration as MethodType, builder as TypeBuilder);
+      } else if (macro is ConstructorTypeMacro && declaration is ConstructorType) {
+        macro.visitConstructorType(declaration as ConstructorType, builder as TypeBuilder);
+      } else {
+        // TODO: Fix other side to check the declaration types
+        // throw StateError('Unable to run $macro on $declaration');
+      }
+      break;
+    case Phase.declaration:
+      if (macro is ClassDeclarationMacro && declaration is ClassDeclaration) {
+        builder = GenericClassDeclarationBuilder();
+        macro.visitClassDeclaration(declaration as ClassDeclaration, builder as ClassDeclarationBuilder);
+      } else if (macro is FieldDeclarationMacro && declaration is FieldDeclaration) {
+        builder = GenericClassDeclarationBuilder();
+        macro.visitFieldDeclaration(declaration as FieldDeclaration, builder as ClassDeclarationBuilder);
+      } else if (macro is FunctionDeclarationMacro && declaration is FunctionDeclaration) {
+        builder = GenericDeclarationBuilder();
+        macro.visitFunctionDeclaration(declaration as FunctionDeclaration, builder as GenericDeclarationBuilder);
+      } else if (macro is MethodDeclarationMacro && declaration is MethodDeclaration) {
+        builder = GenericClassDeclarationBuilder();
+        macro.visitMethodDeclaration(declaration as MethodDeclaration, builder as ClassDeclarationBuilder);
+      } else if (macro is ConstructorDeclarationMacro && declaration is ConstructorDeclaration) {
+        builder = GenericClassDeclarationBuilder();
+        macro.visitConstructorDeclaration(declaration as ConstructorDeclaration, builder as ClassDeclarationBuilder);
+      } else {
+        // TODO: Fix other side to check the declaration types
+        builder = GenericTypeBuilder();
+        // throw StateError('Unable to run $macro on $declaration');
+      }
+      break;
+    case Phase.definition:
+      if (macro is FieldDefinitionMacro && declaration is FieldDefinition) {
+        builder = GenericFieldDefinitionBuilder();
+        macro.visitFieldDefinition(declaration as FieldDefinition, builder as FieldDefinitionBuilder);
+      } else if (macro is FunctionDefinitionMacro && declaration is FunctionDefinition) {
+        builder = GenericFunctionDefinitionBuilder();
+        macro.visitFunctionDefinition(declaration as FunctionDefinition, builder as FunctionDefinitionBuilder);
+      } else if (macro is MethodDefinitionMacro && declaration is MethodDefinition) {
+        builder = GenericFunctionDefinitionBuilder();
+        macro.visitMethodDefinition(declaration as MethodDefinition, builder as FunctionDefinitionBuilder);
+      } else if (macro is ConstructorDefinitionMacro && declaration is ConstructorDefinition) {
+        builder = GenericConstructorDefinitionBuilder();
+        macro.visitConstructorDefinition(declaration as ConstructorDefinition, builder as ConstructorDefinitionBuilder);
+      } else {
+        // TODO: Fix other side to check the declaration types
+        builder = GenericTypeBuilder();
+        // throw StateError('Unable to run $macro on $declaration');
+      }
+      break;
+  }
+
+  return RunMacroResponse(builder.builtCode.join('\n\n'));
 }
 
 ReflectTypeResponse<T> reflectTypeSync<T extends Serializable>(
         ReflectTypeRequest request) {
   stdout.writeln(jsonEncode(request.toJson()));
   var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
+  assert(message['type'] == 'ReflectTypeResponse');
   return ReflectTypeResponse<T>.fromJson(message);
 }
 
@@ -289,7 +420,9 @@ void main(List<String> _) async {
 
   while (await stdinLines.hasNext) {
     var line = await stdinLines.next;
-    var request = RunMacroRequest.fromJson(jsonDecode(line) as Map<String, Object?>);
+    var json = jsonDecode(line) as Map<String, Object?>;
+    assert(json['type'] == 'RunMacroRequest');
+    var request = RunMacroRequest.fromJson(json);
     var response = await _runMacro(request);
     stdout.writeln(jsonEncode(response.toJson()));
   }
