@@ -377,6 +377,7 @@ Serializable _getDeclaration(DeclarationDescriptor descriptor) {
 }
 
 Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
+  var watch = Stopwatch()..start();
   Macro? macro; // Gets built in the switch
   switch (request.identifier) {''');
 
@@ -455,8 +456,11 @@ Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
       }
       break;
   }
-
-  return RunMacroResponse(builder.builtCode.join('\n\n'));
+  watch.stop();
+  return RunMacroResponse("""
+elapsed internal:(${watch.elapsed})
+code: ${builder.builtCode.join('\n\n')}
+""");
 }
 
 final _cache = <TypeReferenceDescriptor, Serializable>{};
