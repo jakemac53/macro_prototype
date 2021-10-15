@@ -12,7 +12,7 @@ abstract class TypeDefinition implements TypeDeclaration {
 /// Class introspection information for [DefinitionMacro]s.
 abstract class ClassDefinition implements TypeDefinition, ClassDeclaration {
   @override
-  Iterable<MethodDefinition> get constructors;
+  Iterable<ConstructorDefinition> get constructors;
 
   @override
   Iterable<MethodDefinition> get methods;

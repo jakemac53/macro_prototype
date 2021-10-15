@@ -8,6 +8,7 @@ dev_dependencies:
   analyzer: ^2.0.0
   async: ^2.8.2
   graphs: ^2.1.0
+  messagepack: ^0.2.1
   package_config: ^2.0.2
   path: ^1.8.0
   pub_semver: ^2.1.0

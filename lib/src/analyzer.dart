@@ -245,7 +245,7 @@ class AnalyzerClassDefinition extends AnalyzerTypeDefinition
       : super._(element, originalReference: originalReference);
 
   @override
-  Iterable<MethodDefinition> get constructors sync* {
+  Iterable<ConstructorDefinition> get constructors sync* {
     for (var constructor in element.constructors) {
       if (constructor.isSynthetic) continue;
       yield AnalyzerConstructorDefinition(constructor, parentClass: element);

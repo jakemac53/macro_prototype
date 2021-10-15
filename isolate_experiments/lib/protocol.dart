@@ -1,9 +1,9 @@
 import 'package:collection/collection.dart';
-import 'package:macro_builder/macros/data_class.dart';
+import 'package:messagepack/messagepack.dart';
 
-import 'src/introspection/serializable.dart';
+import 'src/introspection/packable.dart';
 
-export 'src/introspection/serializable.dart';
+export 'src/introspection/packable.dart';
 export 'src/builders/builders.dart';
 
 enum Phase {
@@ -12,102 +12,92 @@ enum Phase {
   definition,
 }
 
-class RunMacroRequest {
-  final String identifier;
+class RunMacroRequest implements Packable {
   final Map<String, Object?> arguments;
-  final DeclarationDescriptor declarationDescriptor;
+  final String identifier;
   final Phase phase;
+  final DeclarationDescriptor declarationDescriptor;
 
   RunMacroRequest(
       this.identifier, this.arguments, this.declarationDescriptor, this.phase);
 
-  RunMacroRequest.fromJson(Map<String, Object?> json)
-      : arguments = json['arguments'] as Map<String, Object?>,
-        identifier = json['identifier'] as String,
-        declarationDescriptor = DeclarationDescriptor.fromJson(
-            json['declarationDescriptor'] as Map<String, Object?>),
-        phase = Phase.values[json['phase'] as int];
+  RunMacroRequest.unpack(Unpacker unpacker)
+      : arguments = unpacker.unpackMap().cast(),
+        identifier = unpacker.unpackString()!,
+        phase = Phase.values[unpacker.unpackInt()!],
+        declarationDescriptor = DeclarationDescriptor.unpack(unpacker);
 
-  Map<String, Object?> toJson() => {
-        'arguments': arguments,
-        'identifier': identifier,
-        'declarationDescriptor': declarationDescriptor.toJson(),
-        'phase': phase.index,
-        'type': 'RunMacroRequest',
-      };
+  @override
+  void pack(Packer packer) {
+    packer.packMapLength(arguments.length);
+    if (arguments.isNotEmpty) {
+      throw UnsupportedError('Macro arguments not supported yet');
+    }
+    packer
+      ..packString(identifier)
+      ..packInt(phase.index);
+    declarationDescriptor.pack(packer);
+  }
 }
 
-class RunMacroResponse {
+class RunMacroResponse implements Packable {
   final String generatedCode;
 
   RunMacroResponse(this.generatedCode);
 
-  RunMacroResponse.fromJson(Map<String, Object?> json)
-      : generatedCode = json['generatedCode'] as String;
+  RunMacroResponse.unpack(Unpacker unpacker)
+      : generatedCode = unpacker.unpackString()!;
 
-  Map<String, Object?> toJson() => {
-        'generatedCode': generatedCode,
-        'type': 'RunMacroResponse',
-      };
+  @override
+  void pack(Packer packer) => packer.packString(generatedCode);
 }
 
-class ReflectTypeRequest {
+class ReflectTypeRequest implements Packable {
   final TypeReferenceDescriptor descriptor;
 
   ReflectTypeRequest(this.descriptor);
 
-  ReflectTypeRequest.fromJson(Map<String, Object?> json)
-      : descriptor = TypeReferenceDescriptor.fromJson(
-            json['descriptor'] as Map<String, Object?>);
+  ReflectTypeRequest.unpack(Unpacker unpacker)
+      : descriptor = TypeReferenceDescriptor.unpack(unpacker);
 
-  Map<String, Object?> toJson() => {
-        'descriptor': descriptor.toJson(),
-        'type': 'ReflectTypeRequest',
-      };
+  @override
+  void pack(Packer packer) => descriptor.pack(packer);
 }
 
-class ReflectTypeResponse<T extends Serializable> {
+class ReflectTypeResponse<T extends Packable> implements Packable {
   final T declaration;
 
   ReflectTypeResponse(this.declaration);
 
-  ReflectTypeResponse.fromJson(Map<String, Object?> json)
-      : declaration =
-            deserializeDeclaration(json['declaration'] as Map<String, Object?>);
+  ReflectTypeResponse.unpack(Unpacker unpacker)
+      : declaration = unpackDeclaration(unpacker);
 
-  Map<String, Object?> toJson() => {
-        'declaration': declaration.toJson(),
-        'type': 'ReflectTypeResponse',
-      };
+  @override
+  void pack(Packer packer) => packDeclaration(declaration, packer);
 }
 
-class GetDeclarationRequest {
+class GetDeclarationRequest implements Packable {
   final DeclarationDescriptor descriptor;
 
   GetDeclarationRequest(this.descriptor);
 
-  GetDeclarationRequest.fromJson(Map<String, Object?> json)
-      : descriptor = DeclarationDescriptor.fromJson(
-            json['descriptor'] as Map<String, Object?>);
+  GetDeclarationRequest.unpack(Unpacker unpacker)
+      : descriptor = DeclarationDescriptor.unpack(unpacker);
 
-  Map<String, Object?> toJson() => {
-        'descriptor': descriptor.toJson(),
-        'type': 'GetDeclarationRequest',
-      };
+  @override
+  void pack(Packer packer) => descriptor.pack(packer);
 }
 
-class GetDeclarationResponse {
-  final Serializable declaration;
+class GetDeclarationResponse implements Packable {
+  final Packable declaration;
+
   GetDeclarationResponse(this.declaration);
 
-  GetDeclarationResponse.fromJson(Map<String, Object?> json)
-      : declaration =
-            deserializeDeclaration(json['declaration'] as Map<String, Object?>);
+  GetDeclarationResponse.unpack(Unpacker unpacker)
+      : declaration = unpackDeclaration(unpacker);
 
-  Map<String, Object?> toJson() => {
-        'declaration': declaration.toJson(),
-        'type': 'GetDeclarationResponse',
-      };
+  @override
+  void pack(Packer packer) => packDeclaration(declaration, packer);
 }
 
 enum DeclarationType {
@@ -117,7 +107,7 @@ enum DeclarationType {
   constructor,
 }
 
-class DeclarationDescriptor {
+class DeclarationDescriptor implements Packable {
   final String libraryUri;
   final String? parentType;
   final String name;
@@ -126,19 +116,18 @@ class DeclarationDescriptor {
   DeclarationDescriptor(
       this.libraryUri, this.parentType, this.name, this.declarationType);
 
-  DeclarationDescriptor.fromJson(Map<String, Object?> json)
-      : libraryUri = json['libraryUri'] as String,
-        parentType = json['parentType'] as String?,
-        name = json['name'] as String,
-        declarationType =
-            DeclarationType.values[json['declarationType'] as int];
+  DeclarationDescriptor.unpack(Unpacker unpacker)
+      : libraryUri = unpacker.unpackString()!,
+        parentType = unpacker.unpackString(),
+        name = unpacker.unpackString()!,
+        declarationType = DeclarationType.values[unpacker.unpackInt()!];
 
-  Map<String, Object?> toJson() => {
-        'libraryUri': libraryUri,
-        if (parentType != null) 'parentType': parentType,
-        'name': name,
-        'declarationType': declarationType.index,
-      };
+  @override
+  void pack(Packer packer) => packer
+    ..packString(libraryUri)
+    ..packString(parentType)
+    ..packString(name)
+    ..packInt(declarationType.index);
 
   @override
   bool operator ==(Object other) =>
@@ -153,7 +142,7 @@ class DeclarationDescriptor {
       Object.hash(declarationType, name, parentType, libraryUri);
 }
 
-class TypeReferenceDescriptor {
+class TypeReferenceDescriptor implements Packable {
   final String libraryUri;
   final String name;
   final bool isNullable;
@@ -162,24 +151,29 @@ class TypeReferenceDescriptor {
   TypeReferenceDescriptor(this.libraryUri, this.name, this.isNullable,
       {this.typeArguments = const []});
 
-  TypeReferenceDescriptor.fromJson(Map<String, Object?> json)
-      : libraryUri = json['libraryUri'] as String,
-        name = json['name'] as String,
-        isNullable = json['isNullable'] as bool,
-        typeArguments = [
-          for (var typeArgJson in json['typeArguments'] as List)
-            TypeReferenceDescriptor.fromJson(
-                typeArgJson as Map<String, Object?>),
-        ];
+  TypeReferenceDescriptor.unpack(Unpacker unpacker)
+      : libraryUri = unpacker.unpackString()!,
+        name = unpacker.unpackString()!,
+        isNullable = unpacker.unpackBool()!,
+        typeArguments = (() {
+          var length = unpacker.unpackListLength();
+          return [
+            for (var i = 0; i < length; i++)
+              TypeReferenceDescriptor.unpack(unpacker)
+          ];
+        })();
 
-  Map<String, Object?> toJson() => {
-        'libraryUri': libraryUri,
-        'name': name,
-        'isNullable': isNullable,
-        'typeArguments': [
-          for (var arg in typeArguments) arg.toJson(),
-        ],
-      };
+  @override
+  void pack(Packer packer) {
+    packer
+      ..packString(libraryUri)
+      ..packString(name)
+      ..packBool(isNullable)
+      ..packListLength(typeArguments.length);
+    for (var typeArg in typeArguments) {
+      typeArg.pack(packer);
+    }
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -194,12 +188,5 @@ class TypeReferenceDescriptor {
       Object.hashAll([libraryUri, name, isNullable, ...typeArguments]);
 }
 
-abstract class Serializable {
-  Map<String, Object?> toJson();
-}
-
 /// This must be assigned by an implementation.
-ReflectTypeResponse<T> Function<T extends Serializable>(
-        ReflectTypeRequest request)
-    // ignore: prefer_function_declarations_over_variables
-    reflectType = <T extends Serializable>(_) => throw UnimplementedError();
+late ReflectTypeResponse Function(ReflectTypeRequest request) reflectType;

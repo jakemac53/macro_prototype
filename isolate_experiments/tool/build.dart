@@ -12,6 +12,7 @@ import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
 import 'package:isolate_experiments/protocol.dart';
+import 'package:messagepack/messagepack.dart';
 import 'package:package_config/package_config.dart';
 import 'package:vm_service/utils.dart';
 import 'package:vm_service/vm_service.dart';
@@ -100,7 +101,7 @@ class _MacroExecutor {
   final io.File macroIsolateFile;
   final io.Process macroProcess;
   final LibraryElement Function(Uri) resolveLibrary;
-  final Stream<String> responseStream;
+  final Stream<List<int>> responseStream;
   final IsolateRef rootIsolate;
   final io.Directory tmpDir;
   final VmService vmService;
@@ -114,14 +115,14 @@ class _MacroExecutor {
     required this.tmpDir,
     required this.vmService,
   }) {
-    responseStream.listen((line) {
-      var json = jsonDecode(line) as Map<String, Object?>;
-      var type = json['type'] as String;
+    responseStream.listen((message) {
+      var unpacker = Unpacker.fromList(message);
+      var type = unpacker.unpackString();
       switch (type) {
         case 'RunMacroResponse':
           if (runMacroResponseCompleter != null) {
             runMacroResponseCompleter!
-                .complete(RunMacroResponse.fromJson(json));
+                .complete(RunMacroResponse.unpack(unpacker));
             runMacroResponseCompleter = null;
           } else {
             throw StateError('Got an unexpected RunMacroResponse');
@@ -129,20 +130,21 @@ class _MacroExecutor {
           break;
         case 'ReflectTypeRequest':
           _log('Responding to ReflectTypeRequest');
-          var request = ReflectTypeRequest.fromJson(json);
+          var request = ReflectTypeRequest.unpack(unpacker);
           var type = _resolveType(request.descriptor);
           _log('Resolved type ${type.getDisplayString(withNullability: true)}');
-          var declaration = SerializableClassDefinition.fromElement(
+          var declaration = PackableClassDefinition.fromElement(
               type.element as ClassElement,
               originalReference: type);
           var response = ReflectTypeResponse(declaration);
           _log('Encoding ResolveTypeResponse');
-          var responseString = jsonEncode(response.toJson());
-          macroProcess.stdin.writeln(responseString);
+          var packer = Packer();
+          response.pack(packer);
+          macroProcess.stdin.add(packer.takeBytes());
           _log('Completed ReflectTypeRequest');
           break;
         case 'GetDeclarationRequest':
-          var request = GetDeclarationRequest.fromJson(json);
+          var request = GetDeclarationRequest.unpack(unpacker);
           var descriptor = request.descriptor;
           var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
           var parentType = descriptor.parentType;
@@ -172,31 +174,33 @@ class _MacroExecutor {
                 break;
             }
           }
-          Serializable declaration;
+          Packable declaration;
           switch (descriptor.declarationType) {
             case DeclarationType.clazz:
-              declaration = SerializableClassDefinition.fromElement(
+              declaration = PackableClassDefinition.fromElement(
                   element as ClassElement,
                   originalReference: element.thisType);
               break;
             case DeclarationType.field:
-              declaration = SerializableFieldDefinition.fromElement(
-                  element as FieldElement);
+              declaration =
+                  PackableFieldDefinition.fromElement(element as FieldElement);
               break;
             case DeclarationType.method:
-              declaration = SerializableMethodDefinition.fromElement(
+              declaration = PackableMethodDefinition.fromElement(
                   element as MethodElement);
               break;
             case DeclarationType.constructor:
-              declaration = SerializableConstructorDefinition.fromElement(
+              declaration = PackableConstructorDefinition.fromElement(
                   element as ConstructorElement);
               break;
           }
           var response = GetDeclarationResponse(declaration);
-          macroProcess.stdin.writeln(jsonEncode(response.toJson()));
+          var packer = Packer();
+          response.pack(packer);
+          macroProcess.stdin.add(packer.takeBytes());
           break;
         default:
-          throw StateError('unhandled response $line');
+          throw StateError('unhandled response $message');
       }
     });
   }
@@ -219,21 +223,22 @@ class _MacroExecutor {
         .transform(const Utf8Decoder())
         .transform(const LineSplitter())
         .listen(io.stderr.writeln);
-    var lines = macroProcess.stdout
-        .transform(const Utf8Decoder())
-        .transform(const LineSplitter());
+    var macroProcessOutput = macroProcess.stdout;
     var serviceCompleter = Completer<VmService>();
-    var responseController = StreamController<String>();
-    lines.listen((line) {
+    var responseController = StreamController<List<int>>();
+    var gotDartDevtoolsLine = false;
+
+    macroProcessOutput.listen((chunk) {
       if (!serviceCompleter.isCompleted) {
         _log('Connecting to vm service');
+        var line = utf8.decode(chunk);
         serviceCompleter.complete(vmServiceConnectUri(convertToWebSocketUrl(
                 serviceProtocolUrl: Uri.parse(line.split(' ').last))
             .toString()));
+      } else if (!gotDartDevtoolsLine) {
+        gotDartDevtoolsLine = true;
       } else {
-        if (!line.startsWith('The Dart DevTools debugger')) {
-          responseController.add(line);
-        }
+        responseController.add(chunk);
       }
     }, onDone: responseController.close);
     var vmService = await serviceCompleter.future;
@@ -283,7 +288,9 @@ class _MacroExecutor {
                   appliedToClass.name, DeclarationType.clazz),
               phase);
           _log('encoding request: (${watch.elapsed})');
-          macroProcess.stdin.writeln(jsonEncode(request.toJson()));
+          var packer = Packer();
+          request.pack(packer);
+          macroProcess.stdin.add(packer.takeBytes());
           _log('sending request: (${watch.elapsed})');
           var response = await runMacroResponseCompleter!.future;
           _log(
@@ -356,6 +363,7 @@ import 'dart:isolate';
 
 import 'package:async/async.dart';
 import 'package:macro_builder/definition.dart';
+import 'package:messagepack/messagepack.dart';
 import 'package:isolate_experiments/protocol.dart';
 ''');
   for (var macro in macros) {
@@ -366,13 +374,17 @@ import 'package:isolate_experiments/protocol.dart';
 
   code.writeln(r'''
 
-final _declarationCache = <DeclarationDescriptor, Serializable>{};
-Serializable _getDeclaration(DeclarationDescriptor descriptor) {
+final _declarationCache = <DeclarationDescriptor, Packable>{};
+Packable _getDeclaration(DeclarationDescriptor descriptor) {
   return _declarationCache.putIfAbsent(descriptor, () {
-    stdout.writeln(jsonEncode(GetDeclarationRequest(descriptor).toJson()));
-    var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
-    assert(message['type'] == 'GetDeclarationResponse');
-    return deserializeDeclaration(message['declaration'] as Map<String, Object?>);
+    var packer = Packer();
+    packer.packString('GetDeclarationRequest');
+    GetDeclarationRequest(descriptor).pack(packer);
+    stdout.add(packer.takeBytes());
+    var message = waitFor(stdinMessages.next);
+    var unpacker = Unpacker.fromList(message);
+    var response = GetDeclarationResponse.unpack(unpacker);
+    return response.declaration;
   });
 }
 
@@ -463,31 +475,37 @@ code: ${builder.builtCode.join('\n\n')}
 """);
 }
 
-final _cache = <TypeReferenceDescriptor, Serializable>{};
+final _cache = <TypeReferenceDescriptor, Packable>{};
 
-ReflectTypeResponse<T> reflectTypeSync<T extends Serializable>(
+ReflectTypeResponse<T> reflectTypeSync<T extends Packable>(
         ReflectTypeRequest request) {
   return ReflectTypeResponse<T>(_cache.putIfAbsent(request.descriptor, () {
-    stdout.writeln(jsonEncode(request.toJson()));
-    var message = jsonDecode(waitFor(stdinLines.next)) as Map<String, Object?>;
-    assert(message['type'] == 'ReflectTypeResponse');
-    return deserializeDeclaration(message['declaration'] as Map<String, Object?>);
+    var packer = Packer();
+    packer.packString('ReflectTypeRequest');
+    request.pack(packer);
+    stdout.add(packer.takeBytes());
+    var message = waitFor(stdinMessages.next);
+    var unpacker = Unpacker.fromList(message);
+    var response = ReflectTypeResponse.unpack(unpacker);
+    return response.declaration;
   }) as T);
 }
 
-final stdinLines = StreamQueue<String>(
-    stdin.transform(const Utf8Decoder()).transform(const LineSplitter()));
+final stdinMessages = StreamQueue<List<int>>(stdin);
 
 void main(List<String> _) async {
   reflectType = reflectTypeSync;
 
-  while (await stdinLines.hasNext) {
-    var line = await stdinLines.next;
-    var json = jsonDecode(line) as Map<String, Object?>;
-    assert(json['type'] == 'RunMacroRequest');
-    var request = RunMacroRequest.fromJson(json);
+  while (await stdinMessages.hasNext) {
+    var message = await stdinMessages.next;
+    var unpacker = Unpacker.fromList(message);
+    var request = RunMacroRequest.unpack(unpacker);
     var response = await _runMacro(request);
-    stdout.writeln(jsonEncode(response.toJson()));
+
+    var packer = Packer();
+    packer.packString('RunMacroResponse');
+    response.pack(packer);
+    stdout.add(packer.takeBytes());
   }
 }
 ''');
