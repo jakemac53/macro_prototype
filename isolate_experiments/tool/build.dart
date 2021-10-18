@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:developer';
 import 'dart:io' as io;
-import 'dart:isolate' as isolate;
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/constant/value.dart';
@@ -12,13 +11,13 @@ import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
 import 'package:isolate_experiments/protocol.dart';
-import 'package:messagepack/messagepack.dart';
 import 'package:package_config/package_config.dart';
-import 'package:vm_service/utils.dart';
+import 'package:path/path.dart' as p;
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
 import 'src/driver.dart';
+import 'src/run_macro.dart';
 
 void main() async {
   _log('Setting up analysis driver');
@@ -82,6 +81,19 @@ void main() async {
     if (lib == null) throw StateError('could not resolve $uri');
     return lib.element;
   });
+
+  reflectType = (request) {
+    var type = macroExecutor._resolveType(request.descriptor);
+    var declaration = PackableClassDefinition.fromElement(
+        type.element as ClassElement,
+        originalReference: type);
+    return ReflectTypeResponse(declaration);
+  };
+  getDeclaration = (request) {
+    var declaration = macroExecutor.getDeclaration(request.descriptor);
+    return GetDeclarationResponse(declaration);
+  };
+
   for (var group in libraryGroups) {
     await macroExecutor._applyMacros(
         group, typeMacroClass.thisType, Phase.type);
@@ -97,171 +109,40 @@ void main() async {
 
 class _MacroExecutor {
   final allMacros = <ClassElement>[];
-  Completer<RunMacroResponse>? runMacroResponseCompleter;
-  final io.File macroIsolateFile;
-  final io.Process macroProcess;
   final LibraryElement Function(Uri) resolveLibrary;
-  final Stream<List<int>> responseStream;
   final IsolateRef rootIsolate;
-  final io.Directory tmpDir;
   final VmService vmService;
+  static final runMacrosFile = io.File(p.join('tool', 'src', 'run_macro.dart'));
+  static final runMacrosBackupFile =
+      io.File(p.join('tool', 'src', 'run_macro.dart.backup'));
 
   _MacroExecutor({
-    required this.macroIsolateFile,
-    required this.macroProcess,
     required this.resolveLibrary,
-    required this.responseStream,
     required this.rootIsolate,
-    required this.tmpDir,
     required this.vmService,
-  }) {
-    responseStream.listen((message) {
-      var unpacker = Unpacker.fromList(message);
-      var type = unpacker.unpackString();
-      switch (type) {
-        case 'RunMacroResponse':
-          if (runMacroResponseCompleter != null) {
-            runMacroResponseCompleter!
-                .complete(RunMacroResponse.unpack(unpacker));
-            runMacroResponseCompleter = null;
-          } else {
-            throw StateError('Got an unexpected RunMacroResponse');
-          }
-          break;
-        case 'ReflectTypeRequest':
-          _log('Responding to ReflectTypeRequest');
-          var request = ReflectTypeRequest.unpack(unpacker);
-          var type = _resolveType(request.descriptor);
-          _log('Resolved type ${type.getDisplayString(withNullability: true)}');
-          var declaration = PackableClassDefinition.fromElement(
-              type.element as ClassElement,
-              originalReference: type);
-          var response = ReflectTypeResponse(declaration);
-          _log('Encoding ResolveTypeResponse');
-          var packer = Packer();
-          response.pack(packer);
-          macroProcess.stdin.add(packer.takeBytes());
-          _log('Completed ReflectTypeRequest');
-          break;
-        case 'GetDeclarationRequest':
-          var request = GetDeclarationRequest.unpack(unpacker);
-          var descriptor = request.descriptor;
-          var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
-          var parentType = descriptor.parentType;
-          Element element;
-          if (parentType == null) {
-            element = library.topLevelElements
-                .firstWhere((element) => element.name == descriptor.name);
-          } else {
-            var parentTypeElement = library.getType(parentType)!;
-            switch (descriptor.declarationType) {
-              case DeclarationType.clazz:
-                element = parentTypeElement;
-                break;
-              case DeclarationType.field:
-                element = parentTypeElement.getField(descriptor.name)!;
-                break;
-              case DeclarationType.method:
-                element = parentTypeElement.getMethod(descriptor.name)!;
-                break;
-              case DeclarationType.constructor:
-                if (descriptor.name.isEmpty) {
-                  element = parentTypeElement.unnamedConstructor!;
-                } else {
-                  element =
-                      parentTypeElement.getNamedConstructor(descriptor.name)!;
-                }
-                break;
-            }
-          }
-          Packable declaration;
-          switch (descriptor.declarationType) {
-            case DeclarationType.clazz:
-              declaration = PackableClassDefinition.fromElement(
-                  element as ClassElement,
-                  originalReference: element.thisType);
-              break;
-            case DeclarationType.field:
-              declaration =
-                  PackableFieldDefinition.fromElement(element as FieldElement);
-              break;
-            case DeclarationType.method:
-              declaration = PackableMethodDefinition.fromElement(
-                  element as MethodElement);
-              break;
-            case DeclarationType.constructor:
-              declaration = PackableConstructorDefinition.fromElement(
-                  element as ConstructorElement);
-              break;
-          }
-          var response = GetDeclarationResponse(declaration);
-          var packer = Packer();
-          response.pack(packer);
-          macroProcess.stdin.add(packer.takeBytes());
-          break;
-        default:
-          throw StateError('unhandled response $message');
-      }
-    });
-  }
+  });
 
   static Future<_MacroExecutor> start(
       LibraryElement Function(Uri) resolveLibrary) async {
-    _log('Generating isolate script');
-    var tmpDir = await io.Directory.systemTemp.createTemp('macroIsolate');
-    var macroIsolateFile = io.File('${tmpDir.path}/main.dart');
-    await macroIsolateFile.writeAsString(_buildIsolateMain([]));
+    _log('Connecting to vm service');
+    var vmServiceInfo = await Service.getInfo();
+    var vmService =
+        await vmServiceConnectUri(vmServiceInfo.serverWebSocketUri!.toString());
+    var vm = await vmService.getVM();
+    var rootIsolate = vm.isolates!.first;
+    _log('Vm service connected');
 
-    _log('Spawning macro process');
-    var macroProcess = await io.Process.start(io.Platform.executable, [
-      '--packages=${await isolate.Isolate.packageConfig}',
-      '--enable-vm-service',
-      macroIsolateFile.uri.toString(),
-    ]);
-    _log('Waiting for initial response');
-    macroProcess.stderr
-        .transform(const Utf8Decoder())
-        .transform(const LineSplitter())
-        .listen(io.stderr.writeln);
-    var macroProcessOutput = macroProcess.stdout;
-    var serviceCompleter = Completer<VmService>();
-    var responseController = StreamController<List<int>>();
-    var gotDartDevtoolsLine = false;
-
-    macroProcessOutput.listen((chunk) {
-      if (!serviceCompleter.isCompleted) {
-        _log('Connecting to vm service');
-        var line = utf8.decode(chunk);
-        serviceCompleter.complete(vmServiceConnectUri(convertToWebSocketUrl(
-                serviceProtocolUrl: Uri.parse(line.split(' ').last))
-            .toString()));
-      } else if (!gotDartDevtoolsLine) {
-        gotDartDevtoolsLine = true;
-      } else {
-        responseController.add(chunk);
-      }
-    }, onDone: responseController.close);
-    var vmService = await serviceCompleter.future;
-    _log('Waiting for macro isolate to be runnable');
-    await vmService.streamListen('Isolate');
-    final rootIsolate = (await vmService.onIsolateEvent.firstWhere((e) {
-      return e.kind == 'IsolateRunnable';
-    }))
-        .isolate!;
+    await runMacrosFile.rename(runMacrosBackupFile.path);
 
     return _MacroExecutor(
-        macroIsolateFile: macroIsolateFile,
-        macroProcess: macroProcess,
         resolveLibrary: resolveLibrary,
-        responseStream: responseController.stream,
         rootIsolate: rootIsolate,
-        tmpDir: tmpDir,
         vmService: vmService);
   }
 
   Future<void> close() async {
-    await tmpDir.delete(recursive: true);
-    macroProcess.kill();
+    await vmService.dispose();
+    await runMacrosBackupFile.rename(runMacrosFile.path);
   }
 
   Future<void> _applyMacros(List<ResolvedLibraryResult> libraryCycle,
@@ -272,33 +153,25 @@ class _MacroExecutor {
         ..visitLibraryElement(library.element);
       for (var match in finder.matches) {
         var watch = Stopwatch();
-        for (var i = 0; i < 100; i++) {
-          _log(
-              'Sending macro request $i for ${match.annotation.toSource()} matching '
-              'type ${macroType.getDisplayString(withNullability: false)} on '
-              '${match.annotatedElement}');
-          watch.start();
-          runMacroResponseCompleter = Completer<RunMacroResponse>();
-          var macroClass = match.value.type as InterfaceType;
-          var appliedToClass = match.annotatedElement as ClassElement;
-          var request = RunMacroRequest(
-              _macroId(macroClass.element),
-              const <String, Object?>{},
-              DeclarationDescriptor(appliedToClass.source.uri.toString(), null,
-                  appliedToClass.name, DeclarationType.clazz),
-              phase);
-          _log('encoding request: (${watch.elapsed})');
-          var packer = Packer();
-          request.pack(packer);
-          macroProcess.stdin.add(packer.takeBytes());
-          _log('sending request: (${watch.elapsed})');
-          var response = await runMacroResponseCompleter!.future;
-          _log(
-              'Macro response $i: ${response.generatedCode} (took ${watch.elapsed})');
-          watch
-            ..stop()
-            ..reset();
-        }
+        _log(
+            'Sending macro request for ${match.annotation.toSource()} matching '
+            'type ${macroType.getDisplayString(withNullability: false)} on '
+            '${match.annotatedElement}');
+        watch.start();
+        var macroClass = match.value.type as InterfaceType;
+        var appliedToClass = match.annotatedElement as ClassElement;
+        var request = RunMacroRequest(
+            _macroId(macroClass.element),
+            const <String, Object?>{},
+            DeclarationDescriptor(appliedToClass.source.uri.toString(), null,
+                appliedToClass.name, DeclarationType.clazz),
+            phase);
+        var response = runMacro(request);
+        _log(
+            'Macro response: ${response.generatedCode} (took ${watch.elapsed})');
+        watch
+          ..stop()
+          ..reset();
       }
     }
   }
@@ -321,7 +194,8 @@ class _MacroExecutor {
 
     _log('Loading macros ${macros.map((m) => m.name).toList()} from libraries: '
         '[${libraryCycle.map((lib) => lib.uri).join(', ')}]');
-    await macroIsolateFile.writeAsString(_buildIsolateMain(allMacros));
+
+    await _writeRunMacrosFile(allMacros, runMacrosFile);
     var reloadResult =
         await vmService.callMethod('reloadSources', isolateId: rootIsolate.id);
     _log('Isolate reloaded: $reloadResult');
@@ -344,6 +218,57 @@ class _MacroExecutor {
             ? NullabilitySuffix.question
             : NullabilitySuffix.none);
   }
+
+  Packable getDeclaration(DeclarationDescriptor descriptor) {
+    var library = resolveLibrary(Uri.parse(descriptor.libraryUri));
+    var parentType = descriptor.parentType;
+    Element element;
+    if (parentType == null) {
+      element = library.topLevelElements
+          .firstWhere((element) => element.name == descriptor.name);
+    } else {
+      var parentTypeElement = library.getType(parentType)!;
+      switch (descriptor.declarationType) {
+        case DeclarationType.clazz:
+          element = parentTypeElement;
+          break;
+        case DeclarationType.field:
+          element = parentTypeElement.getField(descriptor.name)!;
+          break;
+        case DeclarationType.method:
+          element = parentTypeElement.getMethod(descriptor.name)!;
+          break;
+        case DeclarationType.constructor:
+          if (descriptor.name.isEmpty) {
+            element = parentTypeElement.unnamedConstructor!;
+          } else {
+            element = parentTypeElement.getNamedConstructor(descriptor.name)!;
+          }
+          break;
+      }
+    }
+    Packable declaration;
+    switch (descriptor.declarationType) {
+      case DeclarationType.clazz:
+        declaration = PackableClassDefinition.fromElement(
+            element as ClassElement,
+            originalReference: element.thisType);
+        break;
+      case DeclarationType.field:
+        declaration =
+            PackableFieldDefinition.fromElement(element as FieldElement);
+        break;
+      case DeclarationType.method:
+        declaration =
+            PackableMethodDefinition.fromElement(element as MethodElement);
+        break;
+      case DeclarationType.constructor:
+        declaration = PackableConstructorDefinition.fromElement(
+            element as ConstructorElement);
+        break;
+    }
+    return declaration;
+  }
 }
 
 Stream<Uri> _findExampleLibraryUris() async* {
@@ -353,45 +278,27 @@ Stream<Uri> _findExampleLibraryUris() async* {
   }
 }
 
-String _buildIsolateMain(List<ClassElement> macros) {
+const _macroImportsStart = '// START MACRO IMPORTS MARKER';
+const _macroImportsEnd = '// END MACRO IMPORTS MARKER';
+const _macroCaseStart = '// START MACRO CASE MARKER';
+const _macroCaseEnd = '// END MACRO CASE MARKER';
+Future<void> _writeRunMacrosFile(
+    List<ClassElement> macros, io.File runMacrosFile) async {
   var importsAdded = <Uri>{};
-  var code = StringBuffer(r'''
-import 'dart:cli';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:isolate';
-
-import 'package:async/async.dart';
-import 'package:macro_builder/definition.dart';
-import 'package:messagepack/messagepack.dart';
-import 'package:isolate_experiments/protocol.dart';
-''');
+  var content = await runMacrosFile.readAsString();
+  var importsStartOffset =
+      content.indexOf(_macroImportsStart) + _macroImportsStart.length + 1;
+  var code = StringBuffer(content.substring(0, importsStartOffset));
   for (var macro in macros) {
     if (importsAdded.add(macro.librarySource.uri)) {
       code.writeln('import \'${macro.librarySource.uri}\';');
     }
   }
+  var importsEndOffset = content.indexOf(_macroImportsEnd);
+  var caseStartOffset =
+      content.indexOf(_macroCaseStart) + _macroCaseStart.length + 1;
 
-  code.writeln(r'''
-
-final _declarationCache = <DeclarationDescriptor, Packable>{};
-Packable _getDeclaration(DeclarationDescriptor descriptor) {
-  return _declarationCache.putIfAbsent(descriptor, () {
-    var packer = Packer();
-    packer.packString('GetDeclarationRequest');
-    GetDeclarationRequest(descriptor).pack(packer);
-    stdout.add(packer.takeBytes());
-    var message = waitFor(stdinMessages.next);
-    var unpacker = Unpacker.fromList(message);
-    var response = GetDeclarationResponse.unpack(unpacker);
-    return response.declaration;
-  });
-}
-
-Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
-  var watch = Stopwatch()..start();
-  Macro? macro; // Gets built in the switch
-  switch (request.identifier) {''');
+  code.write(content.substring(importsEndOffset, caseStartOffset));
 
   for (var macro in macros) {
     // TODO: support arguments to constructors
@@ -400,116 +307,9 @@ Future<RunMacroResponse> _runMacro(RunMacroRequest request) async {
       macro = const ${macro.name}();
       break;''');
   }
-
-  code.writeln(r'''
-    default:
-      throw StateError('Unknown macro ${request.identifier}');
-  }
-
-  final declaration = _getDeclaration(request.declarationDescriptor);
-  late GenericBuilder builder;
-  switch(request.phase) {
-    case Phase.type:
-      builder = GenericTypeBuilder();
-      if (macro is ClassTypeMacro && declaration is ClassType) {
-        macro.visitClassType(declaration as ClassType, builder as TypeBuilder);
-      } else if (macro is FieldTypeMacro && declaration is FieldType) {
-        macro.visitFieldType(declaration as FieldType, builder as TypeBuilder);
-      } else if (macro is FunctionTypeMacro && declaration is FunctionType) {
-        macro.visitFunctionType(declaration as FunctionType, builder as TypeBuilder);
-      } else if (macro is MethodTypeMacro && declaration is MethodType) {
-        macro.visitMethodType(declaration as MethodType, builder as TypeBuilder);
-      } else if (macro is ConstructorTypeMacro && declaration is ConstructorType) {
-        macro.visitConstructorType(declaration as ConstructorType, builder as TypeBuilder);
-      } else {
-        // TODO: Fix other side to check the declaration types
-        // throw StateError('Unable to run $macro on $declaration');
-      }
-      break;
-    case Phase.declaration:
-      if (macro is ClassDeclarationMacro && declaration is ClassDeclaration) {
-        builder = GenericClassDeclarationBuilder();
-        macro.visitClassDeclaration(declaration as ClassDeclaration, builder as ClassDeclarationBuilder);
-      } else if (macro is FieldDeclarationMacro && declaration is FieldDeclaration) {
-        builder = GenericClassDeclarationBuilder();
-        macro.visitFieldDeclaration(declaration as FieldDeclaration, builder as ClassDeclarationBuilder);
-      } else if (macro is FunctionDeclarationMacro && declaration is FunctionDeclaration) {
-        builder = GenericDeclarationBuilder();
-        macro.visitFunctionDeclaration(declaration as FunctionDeclaration, builder as GenericDeclarationBuilder);
-      } else if (macro is MethodDeclarationMacro && declaration is MethodDeclaration) {
-        builder = GenericClassDeclarationBuilder();
-        macro.visitMethodDeclaration(declaration as MethodDeclaration, builder as ClassDeclarationBuilder);
-      } else if (macro is ConstructorDeclarationMacro && declaration is ConstructorDeclaration) {
-        builder = GenericClassDeclarationBuilder();
-        macro.visitConstructorDeclaration(declaration as ConstructorDeclaration, builder as ClassDeclarationBuilder);
-      } else {
-        // TODO: Fix other side to check the declaration types
-        builder = GenericTypeBuilder();
-        // throw StateError('Unable to run $macro on $declaration');
-      }
-      break;
-    case Phase.definition:
-      if (macro is FieldDefinitionMacro && declaration is FieldDefinition) {
-        builder = GenericFieldDefinitionBuilder();
-        macro.visitFieldDefinition(declaration as FieldDefinition, builder as FieldDefinitionBuilder);
-      } else if (macro is FunctionDefinitionMacro && declaration is FunctionDefinition) {
-        builder = GenericFunctionDefinitionBuilder();
-        macro.visitFunctionDefinition(declaration as FunctionDefinition, builder as FunctionDefinitionBuilder);
-      } else if (macro is MethodDefinitionMacro && declaration is MethodDefinition) {
-        builder = GenericFunctionDefinitionBuilder();
-        macro.visitMethodDefinition(declaration as MethodDefinition, builder as FunctionDefinitionBuilder);
-      } else if (macro is ConstructorDefinitionMacro && declaration is ConstructorDefinition) {
-        builder = GenericConstructorDefinitionBuilder();
-        macro.visitConstructorDefinition(declaration as ConstructorDefinition, builder as ConstructorDefinitionBuilder);
-      } else {
-        // TODO: Fix other side to check the declaration types
-        builder = GenericTypeBuilder();
-        // throw StateError('Unable to run $macro on $declaration');
-      }
-      break;
-  }
-  watch.stop();
-  return RunMacroResponse("""
-elapsed internal:(${watch.elapsed})
-code: ${builder.builtCode.join('\n\n')}
-""");
-}
-
-final _cache = <TypeReferenceDescriptor, Packable>{};
-
-ReflectTypeResponse<T> reflectTypeSync<T extends Packable>(
-        ReflectTypeRequest request) {
-  return ReflectTypeResponse<T>(_cache.putIfAbsent(request.descriptor, () {
-    var packer = Packer();
-    packer.packString('ReflectTypeRequest');
-    request.pack(packer);
-    stdout.add(packer.takeBytes());
-    var message = waitFor(stdinMessages.next);
-    var unpacker = Unpacker.fromList(message);
-    var response = ReflectTypeResponse.unpack(unpacker);
-    return response.declaration;
-  }) as T);
-}
-
-final stdinMessages = StreamQueue<List<int>>(stdin);
-
-void main(List<String> _) async {
-  reflectType = reflectTypeSync;
-
-  while (await stdinMessages.hasNext) {
-    var message = await stdinMessages.next;
-    var unpacker = Unpacker.fromList(message);
-    var request = RunMacroRequest.unpack(unpacker);
-    var response = await _runMacro(request);
-
-    var packer = Packer();
-    packer.packString('RunMacroResponse');
-    response.pack(packer);
-    stdout.add(packer.takeBytes());
-  }
-}
-''');
-  return code.toString();
+  var caseEndOffset = content.indexOf(_macroCaseEnd);
+  code.write(content.substring(caseEndOffset));
+  await runMacrosFile.writeAsString(code.toString());
 }
 
 final _watch = Stopwatch()..start();

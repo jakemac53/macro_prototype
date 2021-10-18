@@ -190,3 +190,7 @@ class TypeReferenceDescriptor implements Packable {
 
 /// This must be assigned by an implementation.
 late ReflectTypeResponse Function(ReflectTypeRequest request) reflectType;
+
+/// This must be assigned by an implementation.
+late GetDeclarationResponse Function(GetDeclarationRequest request)
+    getDeclaration;
