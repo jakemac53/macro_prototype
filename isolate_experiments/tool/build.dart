@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io' as io;
+import 'dart:isolate' as isolate;
 
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/constant/value.dart';
@@ -11,13 +12,14 @@ import 'package:analyzer/dart/element/type_system.dart';
 import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
 import 'package:isolate_experiments/protocol.dart';
+import 'package:isolate_experiments/protocol.dart' as protocol;
 import 'package:package_config/package_config.dart';
 import 'package:path/path.dart' as p;
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
 import 'src/driver.dart';
-import 'src/run_macro.dart';
+import 'src/run_macro_template.dart' as runMacroTemplate;
 
 void main() async {
   _log('Setting up analysis driver');
@@ -94,33 +96,64 @@ void main() async {
     return GetDeclarationResponse(declaration);
   };
 
-  for (var group in libraryGroups) {
-    await macroExecutor._applyMacros(
-        group, typeMacroClass.thisType, Phase.type);
-    await macroExecutor._applyMacros(
-        group, declarationMacroClass.thisType, Phase.declaration);
-    await macroExecutor._applyMacros(
-        group, definitionMacroClass.thisType, Phase.definition);
-    await macroExecutor._discoverAndLoadMacros(group, macroClass.thisType);
+  try {
+    for (var group in libraryGroups) {
+      await macroExecutor._applyMacros(
+          group, typeMacroClass.thisType, Phase.type);
+      await macroExecutor._applyMacros(
+          group, declarationMacroClass.thisType, Phase.declaration);
+      await macroExecutor._applyMacros(
+          group, definitionMacroClass.thisType, Phase.definition);
+      await macroExecutor._discoverAndLoadMacros(group, macroClass.thisType);
+    }
+  } finally {
+    _log('Exiting');
+    await macroExecutor.close();
   }
-  _log('Exiting');
-  await macroExecutor.close();
 }
 
 class _MacroExecutor {
   final allMacros = <ClassElement>[];
   final LibraryElement Function(Uri) resolveLibrary;
-  final IsolateRef rootIsolate;
+  final IsolateRef macroIsolateRef;
+  final isolate.Isolate macroIsolate;
   final VmService vmService;
-  static final runMacrosFile = io.File(p.join('tool', 'src', 'run_macro.dart'));
-  static final runMacrosBackupFile =
-      io.File(p.join('tool', 'src', 'run_macro.dart.backup'));
+  final isolate.SendPort sendPort;
+  final Stream<Object> responseStream;
+  static final runMacrosFile =
+      io.File(p.join(p.join('tool', 'src', 'run_macro.dart')));
+  static final runMacrosTemplate =
+      io.File(p.join('tool', 'src', 'run_macro_template.dart'));
+
+  Completer<RunMacroResponse>? _runMacroResponseCompleter;
 
   _MacroExecutor({
     required this.resolveLibrary,
-    required this.rootIsolate,
+    required this.macroIsolate,
+    required this.macroIsolateRef,
     required this.vmService,
-  });
+    required this.sendPort,
+    required this.responseStream,
+  }) {
+    responseStream.listen((event) {
+      if (event is RunMacroResponse) {
+        _runMacroResponseCompleter!.complete(event);
+        _runMacroResponseCompleter = null;
+      } else if (event is ReflectTypeRequest) {
+        sendPort.send(protocol.reflectType(event));
+      } else if (event is GetDeclarationRequest) {
+        sendPort.send(protocol.getDeclaration(event));
+      }
+    });
+    var errorPort = isolate.ReceivePort();
+    errorPort.listen((message) {
+      if (_runMacroResponseCompleter != null) {
+        _runMacroResponseCompleter!.completeError(message as Object);
+        _runMacroResponseCompleter = null;
+      }
+    });
+    macroIsolate.addErrorListener(errorPort.sendPort);
+  }
 
   static Future<_MacroExecutor> start(
       LibraryElement Function(Uri) resolveLibrary) async {
@@ -128,21 +161,39 @@ class _MacroExecutor {
     var vmServiceInfo = await Service.getInfo();
     var vmService =
         await vmServiceConnectUri(vmServiceInfo.serverWebSocketUri!.toString());
-    var vm = await vmService.getVM();
-    var rootIsolate = vm.isolates!.first;
     _log('Vm service connected');
 
-    await runMacrosFile.rename(runMacrosBackupFile.path);
+    // TODO: could we spawn this with just `spawn` and the original version of
+    // the `runMacro` file?
+    var receivePort = isolate.ReceivePort();
+    var sendPort = Completer<isolate.SendPort>();
+    var responseStreamController = StreamController<Object>(sync: true);
+    receivePort.listen((message) {
+      if (!sendPort.isCompleted) {
+        sendPort.complete(message as isolate.SendPort);
+      } else {
+        responseStreamController.add(message as Object);
+      }
+    }).onDone(responseStreamController.close);
+
+    var macroIsolate = await isolate.Isolate.spawn(
+        runMacroTemplate.spawn, receivePort.sendPort);
+    var vm = await vmService.getVM();
+    var macroIsolateRef = vm.isolates!.first;
+    _log(vm.isolates!.toString());
 
     return _MacroExecutor(
         resolveLibrary: resolveLibrary,
-        rootIsolate: rootIsolate,
-        vmService: vmService);
+        macroIsolate: macroIsolate,
+        macroIsolateRef: macroIsolateRef,
+        vmService: vmService,
+        sendPort: await sendPort.future,
+        responseStream: responseStreamController.stream);
   }
 
   Future<void> close() async {
     await vmService.dispose();
-    await runMacrosBackupFile.rename(runMacrosFile.path);
+    await runMacrosFile.writeAsString(await runMacrosTemplate.readAsString());
   }
 
   Future<void> _applyMacros(List<ResolvedLibraryResult> libraryCycle,
@@ -166,7 +217,9 @@ class _MacroExecutor {
             DeclarationDescriptor(appliedToClass.source.uri.toString(), null,
                 appliedToClass.name, DeclarationType.clazz),
             phase);
-        var response = runMacro(request);
+        sendPort.send(request);
+        _runMacroResponseCompleter = Completer();
+        var response = await _runMacroResponseCompleter!.future;
         _log(
             'Macro response: ${response.generatedCode} (took ${watch.elapsed})');
         watch
@@ -196,8 +249,8 @@ class _MacroExecutor {
         '[${libraryCycle.map((lib) => lib.uri).join(', ')}]');
 
     await _writeRunMacrosFile(allMacros, runMacrosFile);
-    var reloadResult =
-        await vmService.callMethod('reloadSources', isolateId: rootIsolate.id);
+    var reloadResult = await vmService.callMethod('reloadSources',
+        isolateId: macroIsolateRef.id);
     _log('Isolate reloaded: $reloadResult');
     return macros;
   }
@@ -309,6 +362,7 @@ Future<void> _writeRunMacrosFile(
   }
   var caseEndOffset = content.indexOf(_macroCaseEnd);
   code.write(content.substring(caseEndOffset));
+  _log(code.toString());
   await runMacrosFile.writeAsString(code.toString());
 }
 
