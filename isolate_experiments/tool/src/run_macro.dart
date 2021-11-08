@@ -3,16 +3,19 @@ import 'dart:cli';
 import 'dart:isolate';
 
 import 'package:macro_builder/definition.dart';
+import 'package:messagepack/messagepack.dart';
 import 'package:isolate_experiments/protocol.dart';
 
 // START MACRO IMPORTS MARKER
 // END MACRO IMPORTS MARKER
 
-void spawn(SendPort sendPort) {
+void main(_, SendPort sendPort) {
   Completer<GetDeclarationResponse>? _getDeclarationCompleter;
   GetDeclarationResponse _getDeclaration(GetDeclarationRequest request) {
     _getDeclarationCompleter = Completer();
-    sendPort.send(request);
+    var packer = Packer()..packString('GetDeclarationRequest');
+    request.pack(packer);
+    sendPort.send(packer.takeBytes());
     return waitFor(_getDeclarationCompleter!.future);
   }
 
@@ -20,8 +23,10 @@ void spawn(SendPort sendPort) {
 
   Completer<ReflectTypeResponse>? _reflectTypeCompleter;
   ReflectTypeResponse _reflectType(ReflectTypeRequest request) {
-    _getDeclarationCompleter = Completer();
-    sendPort.send(request);
+    _reflectTypeCompleter = Completer();
+    var packer = Packer()..packString('ReflectTypeRequest');
+    request.pack(packer);
+    sendPort.send(packer.takeBytes());
     return waitFor(_reflectTypeCompleter!.future);
   }
 
@@ -30,14 +35,26 @@ void spawn(SendPort sendPort) {
   var receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
   receivePort.listen((message) {
-    if (message is RunMacroRequest) {
-      sendPort.send(_runMacro(message));
-    } else if (message is GetDeclarationResponse) {
-      _getDeclarationCompleter!.complete(message);
-      _getDeclarationCompleter = null;
-    } else if (message is ReflectTypeResponse) {
-      _reflectTypeCompleter!.complete(message);
-      _reflectTypeCompleter = null;
+    var unpacker = Unpacker.fromList(message as List<int>);
+    var eventType = unpacker.unpackString();
+
+    switch (eventType) {
+      case 'RunMacroRequest':
+        var packer = Packer()..packString('RunMacroResponse');
+        _runMacro(RunMacroRequest.unpack(unpacker)).pack(packer);
+        sendPort.send(packer.takeBytes());
+        break;
+      case 'GetDeclarationResponse':
+        _getDeclarationCompleter!
+            .complete(GetDeclarationResponse.unpack(unpacker));
+        _getDeclarationCompleter = null;
+        break;
+      case 'ReflectTypeResponse':
+        _reflectTypeCompleter!.complete(ReflectTypeResponse.unpack(unpacker));
+        _reflectTypeCompleter = null;
+        break;
+      default:
+        throw StateError('Unrecognized event type $eventType');
     }
   });
 }

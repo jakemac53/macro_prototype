@@ -13,13 +13,14 @@ import 'package:analyzer/dart/element/visitor.dart';
 import 'package:graphs/graphs.dart';
 import 'package:isolate_experiments/protocol.dart';
 import 'package:isolate_experiments/protocol.dart' as protocol;
+import 'package:messagepack/messagepack.dart';
 import 'package:package_config/package_config.dart';
 import 'package:path/path.dart' as p;
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
 import 'src/driver.dart';
-import 'src/run_macro_template.dart' as runMacroTemplate;
+// import 'src/run_macro_template.dart' as runMacroTemplate;
 
 void main() async {
   _log('Setting up analysis driver');
@@ -120,8 +121,7 @@ class _MacroExecutor {
   final VmService vmService;
   final isolate.SendPort sendPort;
   final Stream<Object> responseStream;
-  static final runMacrosFile =
-      io.File(p.join(p.join('tool', 'src', 'run_macro.dart')));
+  static final runMacrosFile = io.File(p.join('tool', 'src', 'run_macro.dart'));
   static final runMacrosTemplate =
       io.File(p.join('tool', 'src', 'run_macro_template.dart'));
 
@@ -136,13 +136,30 @@ class _MacroExecutor {
     required this.responseStream,
   }) {
     responseStream.listen((event) {
-      if (event is RunMacroResponse) {
-        _runMacroResponseCompleter!.complete(event);
-        _runMacroResponseCompleter = null;
-      } else if (event is ReflectTypeRequest) {
-        sendPort.send(protocol.reflectType(event));
-      } else if (event is GetDeclarationRequest) {
-        sendPort.send(protocol.getDeclaration(event));
+      var unpacker = Unpacker.fromList(event as List<int>);
+      var eventType = unpacker.unpackString();
+      switch (eventType) {
+        case 'RunMacroResponse':
+          _runMacroResponseCompleter!
+              .complete(RunMacroResponse.unpack(unpacker));
+          _runMacroResponseCompleter = null;
+          break;
+        case 'ReflectTypeRequest':
+          var packer = Packer()..packString('ReflectTypeResponse');
+          protocol
+              .reflectType(ReflectTypeRequest.unpack(unpacker))
+              .pack(packer);
+          sendPort.send(packer.takeBytes());
+          break;
+        case 'GetDeclarationRequest':
+          var packer = Packer()..packString('GetDeclarationResponse');
+          protocol
+              .getDeclaration(GetDeclarationRequest.unpack(unpacker))
+              .pack(packer);
+          sendPort.send(packer.takeBytes());
+          break;
+        default:
+          throw StateError('Unrecognized event type $eventType');
       }
     });
     var errorPort = isolate.ReceivePort();
@@ -176,10 +193,11 @@ class _MacroExecutor {
       }
     }).onDone(responseStreamController.close);
 
-    var macroIsolate = await isolate.Isolate.spawn(
-        runMacroTemplate.spawn, receivePort.sendPort);
+    await runMacrosFile.writeAsString(await runMacrosTemplate.readAsString());
+    var macroIsolate = await isolate.Isolate.spawnUri(
+        runMacrosFile.absolute.uri, [], receivePort.sendPort);
     var vm = await vmService.getVM();
-    var macroIsolateRef = vm.isolates!.first;
+    var macroIsolateRef = vm.isolates!.last;
     _log(vm.isolates!.toString());
 
     return _MacroExecutor(
@@ -217,7 +235,9 @@ class _MacroExecutor {
             DeclarationDescriptor(appliedToClass.source.uri.toString(), null,
                 appliedToClass.name, DeclarationType.clazz),
             phase);
-        sendPort.send(request);
+        var packer = Packer()..packString('RunMacroRequest');
+        request.pack(packer);
+        sendPort.send(packer.takeBytes());
         _runMacroResponseCompleter = Completer();
         var response = await _runMacroResponseCompleter!.future;
         _log(
@@ -362,7 +382,6 @@ Future<void> _writeRunMacrosFile(
   }
   var caseEndOffset = content.indexOf(_macroCaseEnd);
   code.write(content.substring(caseEndOffset));
-  _log(code.toString());
   await runMacrosFile.writeAsString(code.toString());
 }
 
