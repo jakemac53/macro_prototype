@@ -1,3 +1,7 @@
+**NOTE**: This repo is out of date with the updated proposal, see the [language
+repo proposal](https://github.com/dart-lang/language/tree/master/working/macros)
+for updated apis and status.
+
 ## Description
 
 This is a basic prototype for 3 phase macros using package:build.
